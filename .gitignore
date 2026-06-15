@@ -1,0 +1,57 @@
+# OS Files
+.DS_Store
+Thumbs.db
+*.db
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Go Backend
+# Compiled binaries
+backend/server.exe
+backend/whatapps-backend
+backend/backend
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Hot-reload tool (Air)
+backend/tmp/
+backend/bin/
+backend/uploads/
+
+# Backend Logs
+backend/log/
+*.log
+
+# Frontend (Node / React)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.svelte-kit/
+frontend/.next/
+frontend/out/
+
+# Log files for NPM / Yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cypress/Testing
+frontend/cypress/videos/
+frontend/cypress/screenshots/
+frontend/.nyc_output/
