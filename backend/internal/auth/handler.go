@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"strings"
 	"time"
 
 	"whatapps/backend/configs"
@@ -118,6 +119,83 @@ func Login(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"token": tokenString,
+		"user": fiber.Map{
+			"id":    user.ID,
+			"uuid":  user.UUID,
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		},
+	})
+}
+
+func Refresh(c *fiber.Ctx) error {
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Missing authorization token",
+		})
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid authorization header format",
+		})
+	}
+
+	cfg := configs.LoadConfig()
+	tokenString := parts[1]
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(cfg.JWTSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid or expired token",
+		})
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid token claims",
+		})
+	}
+
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid token payload",
+		})
+	}
+
+	var user model.User
+	if err := database.DB.First(&user, uint64(userID)).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": user.ID,
+		"uuid":    user.UUID.String(),
+		"role":    user.Role,
+		"exp":     time.Now().Add(time.Hour * 72).Unix(),
+	})
+
+	tokenStr, err := newToken.SignedString([]byte(cfg.JWTSecret))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate token",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"token": tokenStr,
 		"user": fiber.Map{
 			"id":    user.ID,
 			"uuid":  user.UUID,
