@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useStore } from './store/useStore';
 import { api, getTokenExpiryUnix } from './services/api';
 import Layout from './components/Layout';
@@ -24,6 +24,7 @@ function NavigationListener() {
   const navigate = useNavigate();
   const logout = useStore((state) => state.logout);
   const token = useStore((state) => state.token);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handle403 = () => navigate('/403');
@@ -33,19 +34,22 @@ function NavigationListener() {
 
   useEffect(() => {
     const handle401 = () => {
+      if (window.location.pathname === '/login') return;
+      queryClient.clear();
       logout();
       navigate('/login', { replace: true });
     };
     window.addEventListener('api-401', handle401);
     return () => window.removeEventListener('api-401', handle401);
-  }, [navigate, logout]);
+  }, [navigate, logout, queryClient]);
 
   useEffect(() => {
     if (!token) return;
     const exp = getTokenExpiryUnix(token);
     if (!exp) return;
     const nowUnix = Math.floor(Date.now() / 1000);
-    if (exp - nowUnix < 24 * 60 * 60) {
+    const secondsLeft = exp - nowUnix;
+    if (secondsLeft > 0 && secondsLeft < 24 * 60 * 60) {
       api.refreshToken();
     }
   }, [token]);

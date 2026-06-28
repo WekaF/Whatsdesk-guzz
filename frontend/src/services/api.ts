@@ -18,6 +18,7 @@ async function tryRefreshToken(): Promise<boolean> {
         if (!r.ok) return false;
         const data = await r.json();
         if (!data?.token || !data?.user) return false;
+        if (!useStore.getState().token) return false;
         useStore.getState().setAuth(data.token, data.user);
         return true;
       })
