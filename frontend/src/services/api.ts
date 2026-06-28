@@ -48,10 +48,12 @@ async function request<T>(path: string, options: RequestInit = {}, _isRetry = fa
   });
 
   if (!response.ok) {
-    if (response.status === 401 && !_isRetry) {
-      const refreshed = await tryRefreshToken();
-      if (refreshed) {
-        return request<T>(path, options, true);
+    if (response.status === 401 && !path.startsWith('/auth/')) {
+      if (!_isRetry) {
+        const refreshed = await tryRefreshToken();
+        if (refreshed) {
+          return request<T>(path, options, true);
+        }
       }
       window.dispatchEvent(new CustomEvent('api-401'));
       throw new Error('Session expired. Please log in again.');
@@ -208,7 +210,8 @@ export const api = {
 
 export function getTokenExpiryUnix(token: string): number | null {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(b64));
     return typeof payload.exp === 'number' ? payload.exp : null;
   } catch {
     return null;
