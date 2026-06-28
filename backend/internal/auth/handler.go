@@ -153,7 +153,7 @@ func Refresh(c *fiber.Ctx) error {
 		return []byte(cfg.JWTSecret), nil
 	})
 
-	if err != nil || !token.Valid {
+	if err != nil || token == nil || !token.Valid {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Invalid or expired token",
 		})
