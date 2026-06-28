@@ -42,6 +42,7 @@ func SetupRoutes(app *fiber.App) {
 	authGroup := app.Group("/auth")
 	authGroup.Post("/register", auth.Register)
 	authGroup.Post("/login", auth.Login)
+	authGroup.Post("/refresh", auth.Refresh)
 
 	// Protected API Routes
 	apiGroup := app.Group("/api", auth.JWTMiddleware())
