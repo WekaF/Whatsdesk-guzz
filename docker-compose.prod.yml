@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: whatdesks-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: whatdesks-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD} --save 60 1 --loglevel warning
+    volumes:
+      - redisdata:/data
+    networks:
+      - internal
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: whatdesks-backend
+    env_file: .env.prod
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://whatsdesk.abdulkhafit.biz.id
+        VITE_WS_URL: wss://whatsdesk.abdulkhafit.biz.id
+    container_name: whatdesks-frontend
+    ports:
+      - "8005:80"
+    volumes:
+      - uploads:/app/uploads:ro
+    networks:
+      - internal
+    depends_on:
+      - backend
+    restart: always
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
