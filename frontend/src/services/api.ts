@@ -3,7 +3,34 @@ import { useStore } from '../store/useStore';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+let _refreshPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  const currentToken = useStore.getState().token;
+  if (!currentToken) return false;
+
+  if (!_refreshPromise) {
+    _refreshPromise = fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${currentToken}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) return false;
+        const data = await r.json();
+        if (!data?.token || !data?.user) return false;
+        useStore.getState().setAuth(data.token, data.user);
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        _refreshPromise = null;
+      });
+  }
+
+  return _refreshPromise;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, _isRetry = false): Promise<T> {
   const token = useStore.getState().token;
   const headers = new Headers(options.headers || {});
   
@@ -21,6 +48,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
+    if (response.status === 401 && !_isRetry) {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) {
+        return request<T>(path, options, true);
+      }
+      window.dispatchEvent(new CustomEvent('api-401'));
+      throw new Error('Session expired. Please log in again.');
+    }
     if (response.status === 403) {
       window.dispatchEvent(new CustomEvent('api-403'));
     }
@@ -166,7 +201,19 @@ export const api = {
   // Menu & Permissions
   listMenus: () => request<any[]>('/api/menus'),
   getCurrentUserPermissions: () => request<any[]>('/api/auth/me/permissions'),
+
+  // Token refresh
+  refreshToken: () => tryRefreshToken(),
 };
+
+export function getTokenExpiryUnix(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
 
 // WebSocket connection helper
 export function connectDeviceWS(
