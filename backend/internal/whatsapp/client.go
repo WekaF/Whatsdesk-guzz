@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -32,11 +33,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// ErrDeviceAlreadyConnected is returned by GetQROnce when the device is already connected.
+var ErrDeviceAlreadyConnected = errors.New("device already connected")
+
 type ClientManager struct {
-	container *sqlstore.Container
-	clients   map[uint64]*whatsmeow.Client
-	mu        sync.RWMutex
-	cfg       *configs.Config
+	container        *sqlstore.Container
+	clients          map[uint64]*whatsmeow.Client
+	mu               sync.RWMutex
+	cfg              *configs.Config
+	activeReconnects sync.Map // map[uint64]bool — devices currently reconnecting
 }
 
 var Manager *ClientManager
@@ -237,7 +242,7 @@ func (cm *ClientManager) GetQROnce(deviceID uint64, timeout time.Duration) (stri
 		return qr, nil
 	case done := <-doneChan:
 		if done {
-			return "", fmt.Errorf("device already connected")
+			return "", ErrDeviceAlreadyConnected
 		}
 		return "", fmt.Errorf("QR generation failed or timed out")
 	case <-time.After(timeout):
@@ -625,6 +630,12 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 
 		// Auto-generate QR and send to Telegram
 		go func(dev model.Device) {
+			if _, loaded := cm.activeReconnects.LoadOrStore(dev.ID, true); loaded {
+				log.Printf("[auto-reconnect] Device %d reconnect already in progress, skipping", dev.ID)
+				return
+			}
+			defer cm.activeReconnects.Delete(dev.ID)
+
 			qr, err := cm.GetQROnce(dev.ID, 30*time.Second)
 			if err != nil {
 				log.Printf("[auto-reconnect] Device %d QR generation failed: %v", dev.ID, err)

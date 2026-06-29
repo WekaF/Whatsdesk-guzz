@@ -1,6 +1,7 @@
 package device
 
 import (
+	"errors"
 	"time"
 	"whatapps/backend/internal/model"
 	"whatapps/backend/internal/whatsapp"
@@ -188,7 +189,7 @@ func GetDeviceQR(c *fiber.Ctx) error {
 
 	qr, err := whatsapp.Manager.GetQROnce(device.ID, 30*time.Second)
 	if err != nil {
-		if err.Error() == "device already connected" {
+		if errors.Is(err, whatsapp.ErrDeviceAlreadyConnected) {
 			return c.Status(fiber.StatusOK).JSON(fiber.Map{"connected": true, "qr": nil})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})

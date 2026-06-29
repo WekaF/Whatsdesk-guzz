@@ -3,6 +3,7 @@ package notify
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -80,11 +81,18 @@ func SendText(botToken, chatID, text string) error {
 		return nil
 	}
 
-	payload := fmt.Sprintf(`{"chat_id":"%s","text":%q}`, chatID, text)
+	type sendMessagePayload struct {
+		ChatID string `json:"chat_id"`
+		Text   string `json:"text"`
+	}
+	b, err := json.Marshal(sendMessagePayload{ChatID: chatID, Text: text})
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(payload))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
 	}
