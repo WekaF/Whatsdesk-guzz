@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -75,6 +76,7 @@ func SendQRCode(botToken, chatID, deviceName, qrBase64 string) error {
 // SendText posts a plain text message to the configured Telegram chat.
 func SendText(botToken, chatID, text string) error {
 	if botToken == "" || chatID == "" {
+		log.Printf("[notify] Telegram not configured — skip text notify")
 		return nil
 	}
 
@@ -84,14 +86,21 @@ func SendText(botToken, chatID, text string) error {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(payload))
 	if err != nil {
-		return err
+		return fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("telegram sendMessage: %w", err)
 	}
 	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram sendMessage status %d", resp.StatusCode)
+	}
+
+	log.Printf("[notify] text message sent to Telegram")
 	return nil
 }
