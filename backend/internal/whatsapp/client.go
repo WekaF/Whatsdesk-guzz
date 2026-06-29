@@ -18,6 +18,7 @@ import (
 	"whatapps/backend/pkg/database"
 
 	"whatapps/backend/internal/autoreply"
+	"whatapps/backend/internal/notify"
 	"whatapps/backend/pkg/logger"
 
 	"github.com/google/uuid"
@@ -217,6 +218,27 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 			}
 		}
 	}()
+}
+
+// GetQROnce starts QR generation and returns the first QR code received.
+// Returns error if device is already connected or QR times out.
+func (cm *ClientManager) GetQROnce(deviceID uint64, timeout time.Duration) (string, error) {
+	qrChan := make(chan string, 1)
+	doneChan := make(chan bool, 1)
+
+	go cm.GenerateQR(deviceID, qrChan, doneChan)
+
+	select {
+	case qr := <-qrChan:
+		return qr, nil
+	case done := <-doneChan:
+		if done {
+			return "", fmt.Errorf("device already connected")
+		}
+		return "", fmt.Errorf("QR generation failed or timed out")
+	case <-time.After(timeout):
+		return "", fmt.Errorf("timeout waiting for QR code")
+	}
 }
 
 // SendTextMessage sends a plain text message to a specific phone number
@@ -571,17 +593,42 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 		}
 
 	case *events.LoggedOut:
-		log.Printf("Device %d logged out", deviceID)
+		log.Printf("Device %d logged out from WhatsApp", deviceID)
 		var device model.Device
-		if err := database.DB.First(&device, deviceID).Error; err == nil {
-			device.Status = "DISCONNECTED"
-			database.DB.Save(&device)
-			
-			PublishWebSocketEvent(deviceID, "device_disconnected", map[string]interface{}{
-				"device_id": deviceID,
-				"status":    "DISCONNECTED",
-			})
+		if err := database.DB.First(&device, deviceID).Error; err != nil {
+			log.Printf("Device %d not found in DB on logout: %v", deviceID, err)
+			return
 		}
+
+		device.Status = "DISCONNECTED"
+		database.DB.Save(&device)
+
+		// Remove stale client so GetOrCreateClient makes a fresh one
+		cm.mu.Lock()
+		delete(cm.clients, deviceID)
+		cm.mu.Unlock()
+
+		PublishWebSocketEvent(deviceID, "device_disconnected", map[string]interface{}{
+			"device_id": deviceID,
+			"status":    "DISCONNECTED",
+		})
+
+		// Auto-generate QR and send to Telegram
+		go func(dev model.Device) {
+			qr, err := cm.GetQROnce(dev.ID, 30*time.Second)
+			if err != nil {
+				log.Printf("[auto-reconnect] Device %d QR generation failed: %v", dev.ID, err)
+				return
+			}
+			if err := notify.SendQRCode(
+				cm.cfg.TelegramBotToken,
+				cm.cfg.TelegramChatID,
+				dev.DeviceName,
+				qr,
+			); err != nil {
+				log.Printf("[auto-reconnect] Telegram notify failed for device %d: %v", dev.ID, err)
+			}
+		}(device)
 	}
 }
 
