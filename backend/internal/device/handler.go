@@ -1,7 +1,10 @@
 package device
 
 import (
+	"errors"
+	"time"
 	"whatapps/backend/internal/model"
+	"whatapps/backend/internal/whatsapp"
 	"whatapps/backend/pkg/database"
 
 	"github.com/gofiber/fiber/v2"
@@ -155,4 +158,42 @@ func DeleteDevice(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Device deleted successfully",
 	})
+}
+
+func GetDeviceQR(c *fiber.Ctx) error {
+	uuidParam := c.Params("uuid")
+
+	var device model.Device
+	if err := database.DB.Where("uuid = ?", uuidParam).First(&device).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "device not found"})
+	}
+
+	// Verify ownership
+	userID, ok := c.Locals("user_id").(uint64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user context"})
+	}
+	var count int64
+	if err := database.DB.Table("user_devices").
+		Where("user_id = ? AND device_id = ?", userID, device.ID).
+		Count(&count).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to verify device ownership"})
+	}
+	if count == 0 {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "access denied"})
+	}
+
+	if device.Status == "CONNECTED" {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{"connected": true, "qr": nil})
+	}
+
+	qr, err := whatsapp.Manager.GetQROnce(device.ID, 30*time.Second)
+	if err != nil {
+		if errors.Is(err, whatsapp.ErrDeviceAlreadyConnected) {
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{"connected": true, "qr": nil})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"connected": false, "qr": qr})
 }

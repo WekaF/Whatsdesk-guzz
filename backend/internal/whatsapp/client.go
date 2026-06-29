@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"whatapps/backend/pkg/database"
 
 	"whatapps/backend/internal/autoreply"
+	"whatapps/backend/internal/notify"
 	"whatapps/backend/pkg/logger"
 
 	"github.com/google/uuid"
@@ -31,11 +33,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// ErrDeviceAlreadyConnected is returned by GetQROnce when the device is already connected.
+var ErrDeviceAlreadyConnected = errors.New("device already connected")
+
 type ClientManager struct {
-	container *sqlstore.Container
-	clients   map[uint64]*whatsmeow.Client
-	mu        sync.RWMutex
-	cfg       *configs.Config
+	container        *sqlstore.Container
+	clients          map[uint64]*whatsmeow.Client
+	mu               sync.RWMutex
+	cfg              *configs.Config
+	activeReconnects sync.Map // map[uint64]bool — devices currently reconnecting
 }
 
 var Manager *ClientManager
@@ -193,8 +199,10 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 					device.Status = "CONNECTED"
 					device.JID = client.Store.ID.String()
 					device.Phone = client.Store.ID.User
-					database.DB.Save(&device)
-					
+					if err := database.DB.Save(&device).Error; err != nil {
+						log.Printf("Failed to save device status for device %d: %v", deviceID, err)
+					}
+
 					// Trigger WS update (to be integrated)
 					PublishWebSocketEvent(deviceID, "device_connected", map[string]interface{}{
 						"device_id": deviceID,
@@ -210,13 +218,38 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 				var device model.Device
 				if err := database.DB.First(&device, deviceID).Error; err == nil {
 					device.Status = "DISCONNECTED"
-					database.DB.Save(&device)
+					if err := database.DB.Save(&device).Error; err != nil {
+						log.Printf("Failed to save device status for device %d: %v", deviceID, err)
+					}
 				}
 				doneChan <- false
 				return
 			}
 		}
 	}()
+}
+
+// GetQROnce starts QR generation and returns the first QR code received.
+// Returns error if device is already connected or QR times out.
+func (cm *ClientManager) GetQROnce(deviceID uint64, timeout time.Duration) (string, error) {
+	qrChan := make(chan string, 1)
+	doneChan := make(chan bool, 1)
+
+	go cm.GenerateQR(deviceID, qrChan, doneChan)
+
+	select {
+	case qr := <-qrChan:
+		return qr, nil
+	case done := <-doneChan:
+		if done {
+			return "", ErrDeviceAlreadyConnected
+		}
+		return "", fmt.Errorf("QR generation failed or timed out")
+	case <-time.After(timeout):
+		// GenerateQR goroutine is orphaned here but bounded: whatsmeow closes
+		// the QR channel on its own timeout (~20s), so the goroutine exits naturally.
+		return "", fmt.Errorf("timeout waiting for QR code")
+	}
 }
 
 // SendTextMessage sends a plain text message to a specific phone number
@@ -571,17 +604,52 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 		}
 
 	case *events.LoggedOut:
-		log.Printf("Device %d logged out", deviceID)
+		log.Printf("Device %d logged out from WhatsApp", deviceID)
 		var device model.Device
-		if err := database.DB.First(&device, deviceID).Error; err == nil {
-			device.Status = "DISCONNECTED"
-			database.DB.Save(&device)
-			
-			PublishWebSocketEvent(deviceID, "device_disconnected", map[string]interface{}{
-				"device_id": deviceID,
-				"status":    "DISCONNECTED",
-			})
+		if err := database.DB.First(&device, deviceID).Error; err != nil {
+			log.Printf("Device %d not found in DB on logout: %v", deviceID, err)
+			return
 		}
+
+		device.Status = "DISCONNECTED"
+		if err := database.DB.Save(&device).Error; err != nil {
+			log.Printf("Failed to save DISCONNECTED status for device %d: %v", deviceID, err)
+		}
+
+		// Remove stale client so GetOrCreateClient makes a fresh one
+		func() {
+			cm.mu.Lock()
+			defer cm.mu.Unlock()
+			delete(cm.clients, deviceID)
+		}()
+
+		PublishWebSocketEvent(deviceID, "device_disconnected", map[string]interface{}{
+			"device_id": deviceID,
+			"status":    "DISCONNECTED",
+		})
+
+		// Auto-generate QR and send to Telegram
+		go func(dev model.Device) {
+			if _, loaded := cm.activeReconnects.LoadOrStore(dev.ID, true); loaded {
+				log.Printf("[auto-reconnect] Device %d reconnect already in progress, skipping", dev.ID)
+				return
+			}
+			defer cm.activeReconnects.Delete(dev.ID)
+
+			qr, err := cm.GetQROnce(dev.ID, 30*time.Second)
+			if err != nil {
+				log.Printf("[auto-reconnect] Device %d QR generation failed: %v", dev.ID, err)
+				return
+			}
+			if err := notify.SendQRCode(
+				cm.cfg.TelegramBotToken,
+				cm.cfg.TelegramChatID,
+				dev.DeviceName,
+				qr,
+			); err != nil {
+				log.Printf("[auto-reconnect] Telegram notify failed for device %d: %v", dev.ID, err)
+			}
+		}(device)
 	}
 }
 
