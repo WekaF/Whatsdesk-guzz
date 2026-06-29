@@ -237,6 +237,8 @@ func (cm *ClientManager) GetQROnce(deviceID uint64, timeout time.Duration) (stri
 		}
 		return "", fmt.Errorf("QR generation failed or timed out")
 	case <-time.After(timeout):
+		// GenerateQR goroutine is orphaned here but bounded: whatsmeow closes
+		// the QR channel on its own timeout (~20s), so the goroutine exits naturally.
 		return "", fmt.Errorf("timeout waiting for QR code")
 	}
 }
@@ -601,12 +603,16 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 		}
 
 		device.Status = "DISCONNECTED"
-		database.DB.Save(&device)
+		if err := database.DB.Save(&device).Error; err != nil {
+			log.Printf("Failed to save DISCONNECTED status for device %d: %v", deviceID, err)
+		}
 
 		// Remove stale client so GetOrCreateClient makes a fresh one
-		cm.mu.Lock()
-		delete(cm.clients, deviceID)
-		cm.mu.Unlock()
+		func() {
+			cm.mu.Lock()
+			defer cm.mu.Unlock()
+			delete(cm.clients, deviceID)
+		}()
 
 		PublishWebSocketEvent(deviceID, "device_disconnected", map[string]interface{}{
 			"device_id": deviceID,
