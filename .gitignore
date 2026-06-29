@@ -55,3 +55,4 @@ pnpm-debug.log*
 frontend/cypress/videos/
 frontend/cypress/screenshots/
 frontend/.nyc_output/
+*.o
