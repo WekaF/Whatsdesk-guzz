@@ -9,18 +9,20 @@ import (
 )
 
 type Config struct {
-	ServerPort    string
-	DBHost        string
-	DBPort        string
-	DBUser        string
-	DBPassword    string
-	DBName        string
-	RedisHost     string
-	RedisPort     string
-	RedisPassword string
-	RedisDB       int
-	JWTSecret     string
-	UploadDir     string
+	ServerPort       string
+	DBHost           string
+	DBPort           string
+	DBUser           string
+	DBPassword       string
+	DBName           string
+	RedisHost        string
+	RedisPort        string
+	RedisPassword    string
+	RedisDB          int
+	JWTSecret        string
+	UploadDir        string
+	TelegramBotToken string
+	TelegramChatID   string
 }
 
 func LoadConfig() *Config {
@@ -47,17 +49,19 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		ServerPort:    getEnvVal("SERVER_PORT", "8000"),
-		DBHost:        getEnvVal("DB_HOST", "localhost"),
-		DBPort:        getEnvVal("DB_PORT", "5432"),
-		DBUser:        getEnvVal("DB_USER", "whatapps"),
-		DBPassword:    getEnvVal("DB_PASSWORD", "whatappspassword"),
-		DBName:        getEnvVal("DB_NAME", "whatapps_db"),
-		RedisHost:     getEnvVal("REDIS_HOST", "localhost"),
-		RedisPort:     getEnvVal("REDIS_PORT", "6379"),
-		RedisPassword: getEnvVal("REDIS_PASSWORD", ""),
-		RedisDB:       redisDB,
-		JWTSecret:     getEnvVal("JWT_SECRET", "super-secret-key-whatsapp-gateway"),
-		UploadDir:     getEnvVal("UPLOAD_DIR", "./uploads"),
+		ServerPort:       getEnvVal("SERVER_PORT", "8000"),
+		DBHost:           getEnvVal("DB_HOST", "localhost"),
+		DBPort:           getEnvVal("DB_PORT", "5432"),
+		DBUser:           getEnvVal("DB_USER", "whatapps"),
+		DBPassword:       getEnvVal("DB_PASSWORD", "whatappspassword"),
+		DBName:           getEnvVal("DB_NAME", "whatapps_db"),
+		RedisHost:        getEnvVal("REDIS_HOST", "localhost"),
+		RedisPort:        getEnvVal("REDIS_PORT", "6379"),
+		RedisPassword:    getEnvVal("REDIS_PASSWORD", ""),
+		RedisDB:          redisDB,
+		JWTSecret:        getEnvVal("JWT_SECRET", "super-secret-key-whatsapp-gateway"),
+		UploadDir:        getEnvVal("UPLOAD_DIR", "./uploads"),
+		TelegramBotToken: getEnvVal("TELEGRAM_BOT_TOKEN", ""),
+		TelegramChatID:   getEnvVal("TELEGRAM_CHAT_ID", ""),
 	}
 }
