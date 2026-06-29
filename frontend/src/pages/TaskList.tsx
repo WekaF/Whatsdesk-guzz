@@ -252,7 +252,7 @@ export default function TaskList() {
     <div className="space-y-6">
       {/* Toast Alert */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl shadow-lg border text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300 ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-md shadow-lg border text-sm flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-300 ${
           toast.type === 'success' 
             ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300' 
             : 'bg-red-50 dark:bg-red-950/80 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
@@ -263,7 +263,7 @@ export default function TaskList() {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center bg-white dark:bg-[#0d1428]/45 p-6 rounded-2xl border border-slate-200 dark:border-[#1e293b]/40 shadow-sm">
+      <div className="flex justify-between items-center bg-white dark:bg-[#0d1428]/45 p-6 rounded-lg border border-slate-200 dark:border-[#1e293b]/40 shadow-sm">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white flex items-center gap-2.5">
             <ClipboardList className="w-7 h-7 text-whatsapp drop-shadow-[0_0_8px_rgba(37,211,102,0.3)]" />
@@ -275,7 +275,7 @@ export default function TaskList() {
         </div>
         <button
           onClick={() => fetchTasks(page)}
-          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-850 transition-all cursor-pointer shadow-sm"
+          className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-850 transition-all cursor-pointer shadow-sm"
           title="Refresh List"
         >
           <RefreshCw className={`w-4.5 h-4.5 ${loading ? 'animate-spin text-whatsapp' : ''}`} />
@@ -283,14 +283,14 @@ export default function TaskList() {
       </div>
 
       {/* Filters Area */}
-      <div className="bg-white dark:bg-[#0d1428]/45 p-6 rounded-2xl border border-slate-200 dark:border-[#1e293b]/40 shadow-sm space-y-4">
+      <div className="bg-white dark:bg-[#0d1428]/45 p-6 rounded-lg border border-slate-200 dark:border-[#1e293b]/40 shadow-sm space-y-4">
         <div className="flex items-center gap-2 text-xs font-bold text-slate-450 dark:text-slate-500 uppercase tracking-wider">
           <Filter className="w-4 h-4" />
           <span>Filters & Search</span>
         </div>
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Live search input */}
-          <div className="relative flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 focus-within:border-whatsapp/50 focus-within:ring-1 focus-within:ring-whatsapp/20 transition-all">
+          <div className="relative flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800 focus-within:border-whatsapp/50 focus-within:ring-1 focus-within:ring-whatsapp/20 transition-all">
             <Search className="w-4 h-4 text-slate-400 dark:text-slate-600 absolute left-3" />
             <input
               type="text"
@@ -302,7 +302,7 @@ export default function TaskList() {
           </div>
 
           {/* Status filter */}
-          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 px-3">
+          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800 px-3">
             <Clock className="w-4 h-4 text-slate-450 mr-2" />
             <select
               value={statusFilter}
@@ -318,7 +318,7 @@ export default function TaskList() {
           </div>
 
           {/* Device filter */}
-          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 px-3">
+          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800 px-3">
             <Smartphone className="w-4 h-4 text-slate-450 mr-2" />
             <select
               value={selectedDevice}
@@ -333,7 +333,7 @@ export default function TaskList() {
           </div>
 
           {/* Category filter */}
-          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 px-3 col-span-1">
+          <div className="flex items-center bg-slate-50 dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800 px-3 col-span-1">
             <Tag className="w-4 h-4 text-slate-450 mr-2" />
             <select
               value={selectedCategory}
@@ -350,7 +350,7 @@ export default function TaskList() {
       </div>
 
       {/* Main Table area */}
-      <div className="bg-white dark:bg-[#0d1428]/45 rounded-2xl border border-slate-200 dark:border-[#1e293b]/40 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#0d1428]/45 rounded-lg border border-slate-200 dark:border-[#1e293b]/40 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
@@ -467,7 +467,7 @@ export default function TaskList() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-xs">
                         <button
                           onClick={() => handleOpenLogs(task)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-whatsapp hover:border-whatsapp dark:hover:border-whatsapp/30 transition-all cursor-pointer bg-slate-50/50 dark:bg-transparent"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-whatsapp hover:border-whatsapp dark:hover:border-whatsapp/30 transition-all cursor-pointer bg-slate-50/50 dark:bg-transparent"
                           title="View Status Change History Logs"
                         >
                           <History className="w-3.5 h-3.5" />
@@ -495,7 +495,7 @@ export default function TaskList() {
               <button
                 disabled={page <= 1 || loading}
                 onClick={() => fetchTasks(page - 1)}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-750 disabled:opacity-50 cursor-pointer transition-all flex items-center justify-center min-w-[32px] h-8"
+                className="p-2 rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-750 disabled:opacity-50 cursor-pointer transition-all flex items-center justify-center min-w-[32px] h-8"
                 title="Previous Page"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -521,7 +521,7 @@ export default function TaskList() {
                     key={pageNum}
                     disabled={loading}
                     onClick={() => fetchTasks(pageNum)}
-                    className={`px-3 py-1 text-xs rounded-xl transition-all cursor-pointer min-w-[32px] h-8 flex items-center justify-center border font-semibold ${
+                    className={`px-3 py-1 text-xs rounded-md transition-all cursor-pointer min-w-[32px] h-8 flex items-center justify-center border font-semibold ${
                       isActive
                         ? 'bg-whatsapp text-white border-whatsapp shadow-[0_0_12px_rgba(37,211,102,0.25)]'
                         : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-750 bg-white dark:bg-transparent'
@@ -535,7 +535,7 @@ export default function TaskList() {
               <button
                 disabled={page >= totalPages || loading}
                 onClick={() => fetchTasks(page + 1)}
-                className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-750 disabled:opacity-50 cursor-pointer transition-all flex items-center justify-center min-w-[32px] h-8"
+                className="p-2 rounded-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-750 disabled:opacity-50 cursor-pointer transition-all flex items-center justify-center min-w-[32px] h-8"
                 title="Next Page"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -575,7 +575,7 @@ export default function TaskList() {
                 ) : selectedTask ? (
                   <div className="space-y-6">
                     {/* Task Info Summary */}
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-150 dark:border-slate-850/80 space-y-3.5">
+                    <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-150 dark:border-slate-850/80 space-y-3.5">
                       <div className="flex justify-between items-center">
                         <span className="font-mono text-xs font-bold text-slate-950 dark:text-white">
                           {selectedTask.number || '-'}
@@ -591,7 +591,7 @@ export default function TaskList() {
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">Triggering Keyword Message</div>
-                        <div className="text-xs italic bg-white dark:bg-slate-950 p-2.5 rounded-xl border border-slate-150 dark:border-slate-850 text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
+                        <div className="text-xs italic bg-white dark:bg-slate-950 p-2.5 rounded-md border border-slate-150 dark:border-slate-850 text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
                           "{selectedTask.trigger_msg}"
                         </div>
                       </div>
@@ -610,7 +610,7 @@ export default function TaskList() {
                             value={selectedTask.updated_by || ''}
                             disabled={selectedTask.status === 'Closed'}
                             onChange={(e) => handleAssignPic(selectedTask.uuid, e.target.value)}
-                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 px-3 py-1.5 rounded-xl text-xs font-semibold focus:outline-none focus:border-whatsapp text-slate-800 dark:text-slate-200 cursor-pointer"
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 px-3 py-1.5 rounded-md text-xs font-semibold focus:outline-none focus:border-whatsapp text-slate-800 dark:text-slate-200 cursor-pointer"
                           >
                             <option value="">Unassigned</option>
                             {assignees.map(a => (
@@ -668,7 +668,7 @@ export default function TaskList() {
                           })}
                         </div>
                       ) : (
-                        <div className="text-center py-8 bg-slate-50 dark:bg-slate-900/20 border border-slate-200 dark:border-slate-900 rounded-xl space-y-1">
+                        <div className="text-center py-8 bg-slate-50 dark:bg-slate-900/20 border border-slate-200 dark:border-slate-900 rounded-md space-y-1">
                           <History className="w-8 h-8 text-slate-300 dark:text-slate-850 mx-auto" />
                           <p className="text-xs text-slate-500 font-medium">No status logs recorded</p>
                           <p className="text-[10px] text-slate-400 max-w-[200px] mx-auto">Logs are recorded automatically when task status changes.</p>

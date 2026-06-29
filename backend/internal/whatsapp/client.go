@@ -1,10 +1,13 @@
 package whatsapp
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -23,11 +26,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/skip2/go-qrcode" // For converting QR code bytes to base64 images
 	"go.mau.fi/whatsmeow"
+	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
-	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -39,6 +43,7 @@ type ClientManager struct {
 }
 
 var Manager *ClientManager
+var connectMu sync.Mutex
 
 func InitManager(cfg *configs.Config, sqlDB *sql.DB) *ClientManager {
 	// Initialize whatsmeow store container
@@ -120,7 +125,11 @@ func (cm *ClientManager) GetOrCreateClient(deviceID uint64) (*whatsmeow.Client, 
 
 	// If already logged in, connect automatically
 	if client.Store.ID != nil {
+		connectMu.Lock()
+		store.DeviceProps.Os = proto.String(cm.cfg.DefaultDeviceName + " - " + device.DeviceName)
+		store.DeviceProps.PlatformType = parsePlatformType(cm.cfg.DevicePlatform).Enum()
 		err := client.Connect()
+		connectMu.Unlock()
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect: %w", err)
 		}
@@ -166,7 +175,18 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 		return
 	}
 
+	// Fetch device info from db for display name
+	var device model.Device
+	deviceName := cm.cfg.DefaultDeviceName
+	if err := database.DB.First(&device, deviceID).Error; err == nil && device.DeviceName != "" {
+		deviceName = cm.cfg.DefaultDeviceName + " - " + device.DeviceName
+	}
+
+	connectMu.Lock()
+	store.DeviceProps.Os = proto.String(deviceName)
+	store.DeviceProps.PlatformType = parsePlatformType(cm.cfg.DevicePlatform).Enum()
 	err = client.Connect()
+	connectMu.Unlock()
 	if err != nil {
 		log.Printf("Failed to connect client: %v", err)
 		doneChan <- false
@@ -186,7 +206,7 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 				qrChan <- fmt.Sprintf("data:image/png;base64,%s", qrBase64)
 			} else if evt.Event == "success" {
 				log.Printf("QR code scanned successfully for device %d", deviceID)
-				
+
 				// Update device status in db
 				var device model.Device
 				if err := database.DB.First(&device, deviceID).Error; err == nil {
@@ -194,7 +214,7 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 					device.JID = client.Store.ID.String()
 					device.Phone = client.Store.ID.User
 					database.DB.Save(&device)
-					
+
 					// Trigger WS update (to be integrated)
 					PublishWebSocketEvent(deviceID, "device_connected", map[string]interface{}{
 						"device_id": deviceID,
@@ -206,7 +226,7 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 				return
 			} else if evt.Event == "timeout" {
 				log.Printf("QR code generation timed out for device %d", deviceID)
-				
+
 				var device model.Device
 				if err := database.DB.First(&device, deviceID).Error; err == nil {
 					device.Status = "DISCONNECTED"
@@ -302,15 +322,45 @@ func (cm *ClientManager) SendMediaMessage(deviceID uint64, phone string, message
 		return "", fmt.Errorf("invalid target phone number or JID: %w", err)
 	}
 
-	// Resolve local path (frontend sends e.g. "/uploads/file.pdf")
-	localPath := "." + mediaURL
-	if !strings.HasPrefix(mediaURL, "/uploads/") {
-		localPath = filepath.Join(".", "uploads", filepath.Base(mediaURL))
+	// Resolve local path (mediaURL could be absolute URL like http://domain/uploads/file.pdf or relative like /uploads/file.pdf)
+	var localPath string
+	if idx := strings.Index(mediaURL, "/uploads/"); idx != -1 {
+		filename := mediaURL[idx+len("/uploads/"):]
+		if qIdx := strings.Index(filename, "?"); qIdx != -1 {
+			filename = filename[:qIdx]
+		}
+		localPath = filepath.Join(cm.cfg.UploadDir, filename)
+	} else if !strings.HasPrefix(mediaURL, "http://") && !strings.HasPrefix(mediaURL, "https://") {
+		localPath = filepath.Join(cm.cfg.UploadDir, filepath.Base(mediaURL))
 	}
 
-	fileBytes, err := os.ReadFile(localPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read local media file: %w", err)
+	var fileBytes []byte
+	if localPath != "" {
+		fileBytes, err = os.ReadFile(localPath)
+	}
+
+	// If local read failed or mediaURL is an external URL, attempt to download it
+	if err != nil || fileBytes == nil {
+		if strings.HasPrefix(mediaURL, "http://") || strings.HasPrefix(mediaURL, "https://") {
+			log.Printf("Media file not found locally. Downloading from: %s", mediaURL)
+			httpClient := &http.Client{Timeout: 30 * time.Second}
+			resp, httpErr := httpClient.Get(mediaURL)
+			if httpErr != nil {
+				return "", fmt.Errorf("failed to download media from URL: %w", httpErr)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return "", fmt.Errorf("failed to download media, status code: %d", resp.StatusCode)
+			}
+
+			fileBytes, err = io.ReadAll(resp.Body)
+			if err != nil {
+				return "", fmt.Errorf("failed to read downloaded media bytes: %w", err)
+			}
+		} else {
+			return "", fmt.Errorf("failed to read local media file: %w", err)
+		}
 	}
 
 	var waMediaType whatsmeow.MediaType
@@ -391,6 +441,20 @@ func (cm *ClientManager) SendMediaMessage(deviceID uint64, phone string, message
 // handleEvent processes incoming whatsmeow events (messages, connection logs, etc.)
 func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 	switch v := evt.(type) {
+	case *events.Connected:
+		log.Printf("Device %d successfully connected to WhatsApp, sending presence available status", deviceID)
+		cm.mu.RLock()
+		client, exists := cm.clients[deviceID]
+		cm.mu.RUnlock()
+		if exists && client != nil {
+			go func() {
+				err := client.SendPresence(context.Background(), types.PresenceAvailable)
+				if err != nil {
+					log.Printf("Failed to send available presence for device %d: %v", deviceID, err)
+				}
+			}()
+		}
+
 	case *events.Message:
 		// Ignore messages from ourselves
 		if v.Info.IsFromMe {
@@ -418,7 +482,7 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 		} else if v.Message.ImageMessage != nil {
 			messageType = "image"
 			msgText = v.Message.ImageMessage.GetCaption()
-			
+
 			// Download image
 			data, err := client.Download(context.Background(), v.Message.ImageMessage)
 			if err == nil {
@@ -429,14 +493,19 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 						ext = "." + parts[1]
 					}
 				}
-				
+
 				uniqueID, _ := uuid.NewRandom()
 				savedName := fmt.Sprintf("incoming_%s%s", uniqueID.String(), ext)
 				_ = os.MkdirAll("./uploads", os.ModePerm)
-				
+
 				err = os.WriteFile(filepath.Join("./uploads", savedName), data, os.ModePerm)
 				if err == nil {
-					mediaURL = "/uploads/" + savedName
+					appURL := strings.TrimSuffix(cm.cfg.AppURL, "/")
+					if appURL != "" {
+						mediaURL = appURL + "/uploads/" + savedName
+					} else {
+						mediaURL = "/uploads/" + savedName
+					}
 				} else {
 					log.Printf("Failed to save incoming image file: %v", err)
 				}
@@ -453,7 +522,7 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 			if fileName == "" {
 				fileName = "document"
 			}
-			
+
 			// Download document
 			data, err := client.Download(context.Background(), v.Message.DocumentMessage)
 			if err == nil {
@@ -466,14 +535,19 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 				if filepath.Ext(fileName) != "" {
 					ext = filepath.Ext(fileName)
 				}
-				
+
 				uniqueID, _ := uuid.NewRandom()
 				savedName := fmt.Sprintf("incoming_%s%s", uniqueID.String(), ext)
 				_ = os.MkdirAll("./uploads", os.ModePerm)
-				
+
 				err = os.WriteFile(filepath.Join("./uploads", savedName), data, os.ModePerm)
 				if err == nil {
-					mediaURL = "/uploads/" + savedName
+					appURL := strings.TrimSuffix(cm.cfg.AppURL, "/")
+					if appURL != "" {
+						mediaURL = appURL + "/uploads/" + savedName
+					} else {
+						mediaURL = "/uploads/" + savedName
+					}
 				} else {
 					log.Printf("Failed to save incoming document file: %v", err)
 				}
@@ -491,9 +565,11 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 		realPhone := database.ResolveRealPhone(v.Info.Chat.String())
 		var activeTask model.Task
 		var taskID *uint64
+		var webhookURL string
 		err := database.DB.Where("device_id = ? AND phone = ? AND status != 'Closed'", deviceID, realPhone).Order("updated_at DESC").First(&activeTask).Error
 		if err == nil && activeTask.ID != 0 {
 			taskID = &activeTask.ID
+			webhookURL = activeTask.WebhookURL
 			// Update the updated_at timestamp of the task to indicate activity
 			database.DB.Model(&activeTask).Update("updated_at", time.Now())
 		}
@@ -546,8 +622,39 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 			"created_at":   msg.CreatedAt,
 		})
 
-		// 3. Trigger Auto Reply matching asynchronously
-		go autoreply.MatchAndTriggerReply(deviceID, &msg)
+		// 3. Webhook Forwarding or Auto Reply
+		if webhookURL != "" {
+			// Forward to Webhook and bypass AutoReply engine
+			log.Printf("[Webhook Session] Forwarding incoming message from %s to webhook: %s", msg.Phone, webhookURL)
+			go func(url string, payload interface{}) {
+				body, _ := json.Marshal(payload)
+				client := &http.Client{Timeout: 10 * time.Second}
+				resp, postErr := client.Post(url, "application/json", bytes.NewBuffer(body))
+				if postErr != nil {
+					log.Printf("[Webhook Session Error] Failed to post webhook: %v", postErr)
+					return
+				}
+				defer resp.Body.Close()
+			}(webhookURL, map[string]interface{}{
+				"device_id":    deviceID,
+				"phone":        msg.Phone,
+				"message":      msg.Message,
+				"message_type": msg.MessageType,
+				"media_url":    msg.MediaURL,
+				"file_name":    msg.FileName,
+				"created_at":   msg.CreatedAt,
+				"task_id":      taskID,
+				"task": map[string]interface{}{
+					"id":     activeTask.ID,
+					"uuid":   activeTask.UUID,
+					"number": activeTask.Number,
+					"status": activeTask.Status,
+				},
+			})
+		} else {
+			// Trigger standard Auto Reply rules
+			go autoreply.MatchAndTriggerReply(deviceID, &msg)
+		}
 
 	case *events.Receipt:
 		// Update status of sent messages if receipt is delivered/read
@@ -576,7 +683,7 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 		if err := database.DB.First(&device, deviceID).Error; err == nil {
 			device.Status = "DISCONNECTED"
 			database.DB.Save(&device)
-			
+
 			PublishWebSocketEvent(deviceID, "device_disconnected", map[string]interface{}{
 				"device_id": deviceID,
 				"status":    "DISCONNECTED",
@@ -590,3 +697,66 @@ func (cm *ClientManager) handleEvent(deviceID uint64, evt interface{}) {
 var PublishWebSocketEvent = func(deviceID uint64, eventType string, data interface{}) {
 	log.Printf("WebSocket Event Published: DeviceID=%d, Type=%s, Data=%v", deviceID, eventType, data)
 }
+
+func (cm *ClientManager) LogoutDevice(deviceID uint64) error {
+	// 1. Get or create the client instance
+	client, err := cm.GetOrCreateClient(deviceID)
+	if err != nil {
+		return err
+	}
+
+	// 2. Perform Logout on WhatsApp server or force local disconnect
+	if client.IsConnected() {
+		err = client.Logout(context.Background())
+		if err != nil {
+			log.Printf("WhatsApp server logout failed for device ID %d: %v, forcing local disconnect", deviceID, err)
+			client.Disconnect()
+		}
+	} else {
+		// Try to connect to unlink cleanly, otherwise delete locally
+		err = client.Connect()
+		if err == nil {
+			_ = client.Logout(context.Background())
+		} else {
+			if client.Store != nil {
+				_ = client.Store.Delete(context.Background())
+			}
+		}
+	}
+
+	// 3. Remove client from memory registry
+	cm.mu.Lock()
+	delete(cm.clients, deviceID)
+	cm.mu.Unlock()
+
+	// 4. Reset connection info in database
+	var device model.Device
+	if err := database.DB.First(&device, deviceID).Error; err == nil {
+		device.Status = "DISCONNECTED"
+		device.JID = ""
+		device.Phone = ""
+		database.DB.Save(&device)
+	}
+
+	return nil
+}
+
+func parsePlatformType(platform string) waCompanionReg.DeviceProps_PlatformType {
+	switch strings.ToUpper(platform) {
+	case "CHROME":
+		return waCompanionReg.DeviceProps_CHROME
+	case "FIREFOX":
+		return waCompanionReg.DeviceProps_FIREFOX
+	case "SAFARI":
+		return waCompanionReg.DeviceProps_SAFARI
+	case "DESKTOP":
+		return waCompanionReg.DeviceProps_DESKTOP
+	case "OPERA":
+		return waCompanionReg.DeviceProps_OPERA
+	case "EDGE":
+		return waCompanionReg.DeviceProps_EDGE
+	default:
+		return waCompanionReg.DeviceProps_EDGE
+	}
+}
+

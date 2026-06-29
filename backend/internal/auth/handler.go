@@ -54,10 +54,11 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	user := model.User{
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: string(hashedPassword),
-		Role:     "user",
+		Name:             req.Name,
+		Email:            req.Email,
+		Password:         string(hashedPassword),
+		Role:             "owner_subscriber",
+		SubscriptionTier: "free",
 	}
 
 	if err := database.DB.Create(&user).Error; err != nil {
@@ -119,11 +120,15 @@ func Login(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"token": tokenString,
 		"user": fiber.Map{
-			"id":    user.ID,
-			"uuid":  user.UUID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
+			"id":                   user.ID,
+			"uuid":                 user.UUID,
+			"name":                 user.Name,
+			"email":                user.Email,
+			"role":                 user.Role,
+			"subscription_tier":    user.SubscriptionTier,
+			"subscription_ends_at": user.SubscriptionEndsAt,
+			"monthly_message_sent": user.MonthlyMessageSent,
+			"message_reset_at":     user.MessageResetAt,
 		},
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -21,6 +22,11 @@ type Config struct {
 	RedisDB       int
 	JWTSecret     string
 	UploadDir     string
+	AppURL        string
+	ApiRateLimitMax        int
+	ApiRateLimitExpSeconds int
+	DefaultDeviceName      string
+	DevicePlatform         string
 }
 
 func LoadConfig() *Config {
@@ -46,6 +52,28 @@ func LoadConfig() *Config {
 		redisDB = 0
 	}
 
+	apiRateLimitMaxStr := getEnvVal("API_RATE_LIMIT_MAX", "60")
+	apiRateLimitMax, err := strconv.Atoi(apiRateLimitMaxStr)
+	if err != nil {
+		apiRateLimitMax = 60
+	}
+
+	apiRateLimitExpStr := getEnvVal("API_RATE_LIMIT_EXPIRATION", "60")
+	apiRateLimitExp, err := strconv.Atoi(apiRateLimitExpStr)
+	if err != nil {
+		apiRateLimitExp = 60
+	}
+
+	appURL := getEnvVal("APP_URL", "")
+	if appURL != "" {
+		if strings.HasPrefix(appURL, "https://") {
+			appURL = "https://" + strings.TrimPrefix(appURL, "https://")
+		} else if strings.HasPrefix(appURL, "http://") {
+			appURL = "http://" + strings.TrimPrefix(appURL, "http://")
+		}
+		appURL = strings.TrimSuffix(appURL, "/")
+	}
+
 	return &Config{
 		ServerPort:    getEnvVal("SERVER_PORT", "8000"),
 		DBHost:        getEnvVal("DB_HOST", "localhost"),
@@ -59,5 +87,10 @@ func LoadConfig() *Config {
 		RedisDB:       redisDB,
 		JWTSecret:     getEnvVal("JWT_SECRET", "super-secret-key-whatsapp-gateway"),
 		UploadDir:     getEnvVal("UPLOAD_DIR", "./uploads"),
+		AppURL:        appURL,
+		ApiRateLimitMax:        apiRateLimitMax,
+		ApiRateLimitExpSeconds: apiRateLimitExp,
+		DefaultDeviceName:      getEnvVal("DEFAULT_DEVICE_NAME", "WhatsDesk"),
+		DevicePlatform:         getEnvVal("DEVICE_PLATFORM", "EDGE"),
 	}
 }

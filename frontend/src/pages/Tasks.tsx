@@ -104,14 +104,14 @@ export default function Tasks() {
     const end = task.status === 'Closed' ? new Date(task.updated_at) : new Date();
     const diffMs = end.getTime() - created.getTime();
     if (diffMs < 0) return 'Just now';
-    
+
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ${diffMins % 60}m`;
-    
+
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays}d ${diffHours % 24}h`;
   };
@@ -175,8 +175,8 @@ export default function Tasks() {
   }, []);
 
   // Fetch Single Task Details
-  const fetchTaskDetails = async (taskUuid: string) => {
-    setDetailLoading(true);
+  const fetchTaskDetails = async (taskUuid: string, silent: boolean = false) => {
+    if (!silent) setDetailLoading(true);
     try {
       const details = await api.getTask(taskUuid);
       setSelectedTask(details);
@@ -187,7 +187,7 @@ export default function Tasks() {
     } catch (err: any) {
       console.error('Failed to fetch task details:', err);
     } finally {
-      setDetailLoading(false);
+      if (!silent) setDetailLoading(false);
     }
   };
 
@@ -302,8 +302,8 @@ export default function Tasks() {
       setReplyText('');
       setUploadedAttachment(null);
 
-      // Refresh task details to load the updated message logs
-      await fetchTaskDetails(selectedTask.uuid);
+      // Refresh task details silently to load the updated message logs without showing a loading spinner
+      await fetchTaskDetails(selectedTask.uuid, true);
     } catch (err: any) {
       showToast(err.message || 'Failed to send message', 'error');
     } finally {
@@ -384,7 +384,7 @@ export default function Tasks() {
       return (
         <div className="space-y-2 max-w-sm">
           <div
-            className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 cursor-zoom-in group shadow-sm bg-black/5"
+            className="relative rounded-md overflow-hidden border border-slate-200 dark:border-slate-800 cursor-zoom-in group shadow-sm bg-black/5"
             onClick={() => setPreviewImage(imgUrl)}
           >
             <img
@@ -407,7 +407,7 @@ export default function Tasks() {
       const docUrl = msg.media_url?.startsWith('http') ? msg.media_url : `${API_URL}${msg.media_url}`;
       return (
         <div className="space-y-2 min-w-[200px] max-w-sm">
-          <div className="p-3 rounded-xl border flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800">
+          <div className="p-3 rounded-md border flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="p-2 rounded-lg bg-red-500/10 text-red-500 flex-shrink-0">
                 <FileText className="w-5 h-5" />
@@ -441,14 +441,14 @@ export default function Tasks() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-sm flex items-center gap-2 animate-pulse">
+        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-sm flex items-center gap-2 animate-pulse">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center bg-white dark:bg-[#0d1428]/45 p-4 rounded-2xl border border-slate-200 dark:border-[#1e293b]/40 shadow-sm">
+      <div className="flex justify-between items-center bg-white dark:bg-[#0d1428]/45 p-4 rounded-lg border border-slate-200 dark:border-[#1e293b]/40 shadow-sm">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white flex items-center gap-2.5">
             <ClipboardList className="w-7 h-7 text-whatsapp drop-shadow-[0_0_8px_rgba(37,211,102,0.3)]" />
@@ -458,7 +458,7 @@ export default function Tasks() {
         </div>
         <button
           onClick={() => fetchTasksList(page)}
-          className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-850 transition-all cursor-pointer shadow-sm flex items-center justify-center"
+          className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-850 transition-all cursor-pointer shadow-sm flex items-center justify-center"
           title="Refresh List"
         >
           <RefreshCw className={`w-4.5 h-4.5 ${listLoading ? 'animate-spin text-whatsapp' : ''}`} />
@@ -469,11 +469,11 @@ export default function Tasks() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-210px)] min-h-[500px]">
 
         {/* Left column: Tasks list (4 cols) */}
-        <div className="lg:col-span-3 glass-card rounded-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800/80">
+        <div className="lg:col-span-3 glass-card rounded-lg flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800/80">
           {/* Filters & Search Box */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-850/80 space-y-3 bg-slate-50/50 dark:bg-slate-950/20">
             {/* Status Tabs */}
-            <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80">
+            <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1 rounded-md border border-slate-200 dark:border-slate-800/80">
               <button
                 onClick={() => setStatusTab('active')}
                 className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${statusTab === 'active'
@@ -505,7 +505,7 @@ export default function Tasks() {
 
             {/* Live Search and Device filter */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="relative flex items-center bg-white dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800/80 focus-within:border-whatsapp/40 transition-all">
+              <div className="relative flex items-center bg-white dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800/80 focus-within:border-whatsapp/40 transition-all">
                 <Search className="w-3.5 h-3.5 text-slate-450 dark:text-slate-500 absolute left-3" />
                 <input
                   type="text"
@@ -516,7 +516,7 @@ export default function Tasks() {
                 />
               </div>
 
-              <div className="flex items-center bg-white dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800/80 px-2">
+              <div className="flex items-center bg-white dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800/80 px-2">
                 <Smartphone className="w-3.5 h-3.5 text-slate-450 dark:text-slate-500 mr-2" />
                 <select
                   value={selectedDevice}
@@ -532,7 +532,7 @@ export default function Tasks() {
 
               {/* Category filter */}
               {taskCategories.length > 0 && (
-                <div className="flex items-center bg-white dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800/80 px-2 sm:col-span-2">
+                <div className="flex items-center bg-white dark:bg-slate-900/60 rounded-md border border-slate-200 dark:border-slate-800/80 px-2 sm:col-span-2">
                   <span className="text-slate-450 dark:text-slate-500 text-[10px] font-bold uppercase mr-2 whitespace-nowrap">Cat:</span>
                   <select
                     value={selectedCategory}
@@ -623,7 +623,7 @@ export default function Tasks() {
                       </div>
 
                       {/* Quote Trigger */}
-                      <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900/80 px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 transition-colors group-hover:border-slate-350 dark:group-hover:border-slate-800/80">
+                      <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-900/80 px-3 py-1.5 rounded-md flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 transition-colors group-hover:border-slate-350 dark:group-hover:border-slate-800/80">
                         <MessageSquare className="w-3.5 h-3.5 text-slate-450 dark:text-slate-550 flex-shrink-0" />
                         <span className="truncate flex-1 italic">
                           {task.trigger_msg}
@@ -685,7 +685,7 @@ export default function Tasks() {
         </div>
 
         {/* Right column: Conversation log detail (8 cols) */}
-        <div className="lg:col-span-8 glass-card rounded-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800/80 bg-slate-50/10 dark:bg-slate-950/5">
+        <div className="lg:col-span-8 glass-card rounded-lg flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800/80 bg-slate-50/10 dark:bg-slate-950/5">
           {detailLoading ? (
             <div className="flex-1 flex justify-center items-center">
               <RefreshCw className="w-8 h-8 text-whatsapp animate-spin" />
@@ -738,7 +738,7 @@ export default function Tasks() {
 
                 {/* Status Selector + Category Assign */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl focus-within:border-whatsapp/30 transition-all shadow-inner">
+                  <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-md focus-within:border-whatsapp/30 transition-all shadow-inner">
                     {getStatusIcon(selectedTask.status)}
                     <select
                       value={selectedTask.status}
@@ -754,7 +754,7 @@ export default function Tasks() {
 
                   {/* Category assign dropdown */}
                   {taskCategories.length > 0 && (
-                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl focus-within:border-indigo-500/30 transition-all shadow-inner">
+                    <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-md focus-within:border-indigo-500/30 transition-all shadow-inner">
                       <span className="text-[10px] font-bold text-slate-450 dark:text-slate-500 uppercase">Cat</span>
                       <select
                         value={selectedTask.category?.uuid || ''}
@@ -776,7 +776,7 @@ export default function Tasks() {
               <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-slate-100/50 dark:bg-[#090e1a]/60 border-y border-slate-200 dark:border-slate-800/50 flex flex-col scrollbar-thin">
 
                 {/* Triggering Message Banner */}
-                <div className="self-center bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/15 rounded-2xl p-4 max-w-lg text-center space-y-2 shadow-sm backdrop-blur-sm">
+                <div className="self-center bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/15 rounded-lg p-4 max-w-lg text-center space-y-2 shadow-sm backdrop-blur-sm">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 text-[10px] font-bold tracking-wider uppercase">
                     <AlertCircle className="w-3 h-3" />
                     <span>Ticket Trigger Msg</span>
@@ -786,7 +786,7 @@ export default function Tasks() {
                 </div>
 
                 {/* Ticket Description / Notes by PIC */}
-                <div className="self-center w-full max-w-lg bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 space-y-2.5 shadow-sm">
+                <div className="self-center w-full max-w-lg bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 rounded-lg p-4 space-y-2.5 shadow-sm">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                       Task Description / Notes
@@ -829,7 +829,7 @@ export default function Tasks() {
                       value={descInput}
                       onChange={(e) => setDescInput(e.target.value)}
                       placeholder="Add task description or notes here..."
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp resize-none min-h-[60px]"
+                      className="w-full px-3 py-2 text-xs rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp resize-none min-h-[60px]"
                     />
                   ) : (
                     <p className={`text-xs whitespace-pre-wrap leading-relaxed ${selectedTask.description ? 'text-slate-700 dark:text-slate-300' : 'text-slate-450 dark:text-slate-600 italic'}`}>
@@ -855,7 +855,7 @@ export default function Tasks() {
                           </span>
 
                           <div
-                            className="px-4 py-2.5 bg-emerald-100/70 dark:bg-emerald-950/50 text-slate-900 dark:text-slate-200 border border-emerald-200 dark:border-emerald-500/25 rounded-2xl rounded-tr-none text-sm leading-relaxed shadow-sm"
+                            className="px-4 py-2.5 bg-emerald-100/70 dark:bg-emerald-950/50 text-slate-900 dark:text-slate-200 border border-emerald-200 dark:border-emerald-500/25 rounded-lg rounded-tr-none text-sm leading-relaxed shadow-sm"
                           >
                             {renderMessageContent(tm)}
                           </div>
@@ -882,7 +882,7 @@ export default function Tasks() {
                             </span>
 
                             <div
-                              className="px-4 py-2.5 bg-white dark:bg-slate-900/75 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-850/85 rounded-2xl rounded-tl-none text-sm leading-relaxed shadow-sm"
+                              className="px-4 py-2.5 bg-white dark:bg-slate-900/75 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-850/85 rounded-lg rounded-tl-none text-sm leading-relaxed shadow-sm"
                             >
                               {renderMessageContent(tm)}
                             </div>
@@ -902,7 +902,7 @@ export default function Tasks() {
               {/* Chat Input Footer */}
               <div className="p-4 border-t border-slate-200 dark:border-slate-850/80 bg-white dark:bg-slate-950/35">
                 {selectedTask.status === 'Closed' ? (
-                  <div className="p-4 bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/10 rounded-2xl text-center text-xs text-red-600 dark:text-red-400 font-semibold flex items-center justify-center gap-2 shadow-inner">
+                  <div className="p-4 bg-red-50 dark:bg-red-500/5 border border-red-100 dark:border-red-500/10 rounded-lg text-center text-xs text-red-600 dark:text-red-400 font-semibold flex items-center justify-center gap-2 shadow-inner">
                     <AlertCircle className="w-4 h-4" />
                     <span>This ticket is Closed. Change status to re-open and reply.</span>
                   </div>
@@ -910,11 +910,11 @@ export default function Tasks() {
                   <form onSubmit={handleSendReply} className="flex flex-col gap-2.5 w-full">
                     {/* Upload Attachment Preview */}
                     {uploadedAttachment && (
-                      <div className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between gap-3 text-xs animate-in slide-in-from-bottom-2 duration-205 shadow-inner">
+                      <div className="p-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 flex items-center justify-between gap-3 text-xs animate-in slide-in-from-bottom-2 duration-205 shadow-inner">
                         <div className="flex items-center gap-2.5 min-w-0">
                           {uploadedAttachment.message_type === 'image' ? (
                             <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 flex-shrink-0">
-                              <img src={`${API_URL}${uploadedAttachment.url}`} alt="Preview" className="w-full h-full object-cover" />
+                              <img src={uploadedAttachment.url.startsWith('http') ? `${uploadedAttachment.url}` : `${uploadedAttachment.url}`} alt="Preview" className="w-full h-full object-cover" />
                             </div>
                           ) : (
                             <div className="p-2 rounded-lg bg-red-500/10 text-red-500 flex-shrink-0">
@@ -948,7 +948,7 @@ export default function Tasks() {
                       />
                       <label
                         htmlFor="chat-file-input"
-                        className={`p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-550 dark:text-slate-400 hover:text-slate-805 dark:hover:text-white transition-all cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0 ${uploadingAttachment ? 'animate-pulse' : ''}`}
+                        className={`p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-550 dark:text-slate-400 hover:text-slate-805 dark:hover:text-white transition-all cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0 ${uploadingAttachment ? 'animate-pulse' : ''}`}
                         title="Attach Image or PDF"
                       >
                         {uploadingAttachment ? (
@@ -958,7 +958,7 @@ export default function Tasks() {
                         )}
                       </label>
 
-                      <div className="flex-1 relative flex items-center bg-slate-50 dark:bg-slate-900/65 rounded-xl border border-slate-200 dark:border-slate-800 focus-within:border-whatsapp/40 focus-within:ring-1 focus-within:ring-whatsapp/30 transition-all shadow-inner">
+                      <div className="flex-1 relative flex items-center bg-slate-50 dark:bg-slate-900/65 rounded-md border border-slate-200 dark:border-slate-800 focus-within:border-whatsapp/40 focus-within:ring-1 focus-within:ring-whatsapp/30 transition-all shadow-inner">
                         <input
                           type="text"
                           value={replyText}
@@ -971,7 +971,7 @@ export default function Tasks() {
                       <button
                         type="submit"
                         disabled={(!replyText.trim() && !uploadedAttachment) || sendingReply || uploadingAttachment}
-                        className="bg-whatsapp hover:bg-emerald-500 text-black px-5 py-3 rounded-xl transition-all cursor-pointer glow-green disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold text-sm shadow-md"
+                        className="bg-whatsapp hover:bg-emerald-500 text-black px-5 py-3 rounded-md transition-all cursor-pointer glow-green disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 font-bold text-sm shadow-md"
                       >
                         {sendingReply ? (
                           <RefreshCw className="w-4.5 h-4.5 animate-spin" />
@@ -1008,11 +1008,11 @@ export default function Tasks() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in"
           onClick={() => setPreviewImage(null)}
         >
-          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-2xl animate-zoom-in" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg border border-slate-800/80 bg-slate-950 shadow-2xl animate-zoom-in" onClick={(e) => e.stopPropagation()}>
             <img src={previewImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain" />
             <button
               onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80 hover:text-whatsapp transition-colors cursor-pointer"
+              className="absolute top-4 right-4 p-2 rounded-md bg-black/60 text-white hover:bg-black/80 hover:text-whatsapp transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1023,7 +1023,7 @@ export default function Tasks() {
       {/* Floating Toast Notification */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-[9999] animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border shadow-xl backdrop-blur-md bg-white/90 dark:bg-[#0d1425]/90 ${toast.type === 'error'
+          <div className={`flex items-center gap-3 px-4 py-3.5 rounded-md border shadow-xl backdrop-blur-md bg-white/90 dark:bg-[#0d1425]/90 ${toast.type === 'error'
             ? 'border-red-500/30 text-red-600 dark:text-red-400 shadow-red-500/5'
             : 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/5'
             }`}>

@@ -14,9 +14,15 @@ type User struct {
 	Nickname       string         `gorm:"size:255" json:"nickname"`
 	Email          string         `gorm:"size:255;uniqueIndex;not null" json:"email"`
 	Password       string         `gorm:"size:255;not null" json:"-"`
-	Role                  string         `gorm:"size:50;default:'user'" json:"role"`
+	Role                  string         `gorm:"size:50;default:'owner_subscriber'" json:"role"`
+	ParentID              *uint64        `gorm:"index" json:"parent_id,omitempty"`
+	Parent                *User          `gorm:"foreignKey:ParentID;constraint:OnDelete:SET NULL" json:"parent,omitempty"`
 	PhoneNumber           string         `gorm:"size:50" json:"phone_number"`
 	IsNotificationEnabled bool           `gorm:"default:false" json:"is_notification_enabled"`
+	SubscriptionTier      string         `gorm:"size:50;default:'free'" json:"subscription_tier"`
+	SubscriptionEndsAt    *time.Time     `json:"subscription_ends_at,omitempty"`
+	MonthlyMessageSent    int            `gorm:"default:0" json:"monthly_message_sent"`
+	MessageResetAt        time.Time      `json:"message_reset_at"`
 	Devices               []Device       `gorm:"many2many:user_devices;" json:"devices,omitempty"`
 	TaskCategories        []TaskCategory `gorm:"many2many:user_task_categories;" json:"task_categories,omitempty"`
 	CreatedAt      time.Time      `json:"created_at"`
@@ -25,6 +31,9 @@ type User struct {
 func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 	if u.UUID == uuid.Nil {
 		u.UUID = uuid.New()
+	}
+	if u.MessageResetAt.IsZero() {
+		u.MessageResetAt = time.Now().AddDate(0, 1, 0)
 	}
 	return nil
 }
@@ -70,6 +79,8 @@ type Message struct {
 	MessageType string     `gorm:"size:50;default:'text';not null" json:"message_type"`
 	MediaURL    string     `gorm:"size:255" json:"media_url,omitempty"`
 	FileName    string     `gorm:"size:255" json:"file_name,omitempty"`
+	ApiKeyID    *uint64    `gorm:"index" json:"api_key_id,omitempty"`
+	ApiKey      *ApiKey    `gorm:"foreignKey:ApiKeyID;constraint:OnDelete:SET NULL" json:"api_key,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
@@ -142,8 +153,9 @@ type AutoReply struct {
 	Device         Device         `gorm:"foreignKey:DeviceID;constraint:OnDelete:CASCADE" json:"-"`
 	Keyword        string         `gorm:"size:255;not null" json:"keyword"`
 	MatchType      string         `gorm:"size:50;not null;default:'EXACT'" json:"match_type"` // EXACT, CONTAINS, START_WITH
-	ReplyMessage   string         `gorm:"type:text;not null" json:"reply_message"`
+	ReplyMessage   string         `gorm:"type:text" json:"reply_message"`
 	IsActive       bool           `gorm:"default:true" json:"is_active"`
+	WebhookURL     string         `gorm:"size:255" json:"webhook_url"`
 	CreateTask     bool           `gorm:"default:false;not null" json:"create_task"`
 	TaskCategoryID *uint64        `gorm:"index" json:"task_category_id,omitempty"`
 	TaskCategory   *TaskCategory  `gorm:"foreignKey:TaskCategoryID;constraint:OnDelete:SET NULL" json:"task_category,omitempty"`
@@ -209,6 +221,7 @@ type Task struct {
 	Category     *TaskCategory `gorm:"foreignKey:CategoryID;constraint:OnDelete:SET NULL" json:"category,omitempty"`
 	Description  string        `gorm:"type:text" json:"description"`
 	UpdatedBy    string        `gorm:"size:255" json:"updated_by,omitempty"`
+	WebhookURL   string        `gorm:"size:255" json:"webhook_url"`
 	PicName      string        `gorm:"-" json:"pic_name,omitempty"`
 	CreatedAt    time.Time     `json:"created_at"`
 	UpdatedAt    time.Time     `json:"updated_at"`
@@ -258,6 +271,31 @@ type TaskCategory struct {
 func (tc *TaskCategory) BeforeCreate(tx *gorm.DB) (err error) {
 	if tc.UUID == uuid.Nil {
 		tc.UUID = uuid.New()
+	}
+	return nil
+}
+
+type ApiKey struct {
+	ID          uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	UUID        uuid.UUID  `gorm:"type:uuid;uniqueIndex;default:uuid_generate_v4()" json:"uuid"`
+	Name        string     `gorm:"size:255;not null" json:"name"`
+	TokenHash   string     `gorm:"size:255;uniqueIndex;not null" json:"-"`
+	MaskedToken string     `gorm:"size:255;not null" json:"masked_token"`
+	DeviceID    uint64     `gorm:"not null" json:"device_id"`
+	Device      Device     `gorm:"foreignKey:DeviceID;constraint:OnDelete:CASCADE" json:"device,omitempty"`
+	UserID      uint64     `gorm:"not null" json:"user_id"`
+	User        User       `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"-"`
+	IsActive    bool       `gorm:"default:true;not null" json:"is_active"`
+	AllowedIPs  string     `gorm:"type:text;default:'*'" json:"allowed_ips"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
+	LastUsedIP  string     `gorm:"size:45" json:"last_used_ip,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
+
+func (ak *ApiKey) BeforeCreate(tx *gorm.DB) (err error) {
+	if ak.UUID == uuid.Nil {
+		ak.UUID = uuid.New()
 	}
 	return nil
 }

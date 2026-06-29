@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -37,8 +38,21 @@ type UserUpdateRequest struct {
 
 // ListUsers handles GET /api/users
 func ListUsers(c *fiber.Ctx) error {
+	currentUserID := c.Locals("user_id").(uint64)
+	currentUserRole := c.Locals("role").(string)
+
+	query := database.DB.Order("id asc").Preload("Devices").Preload("TaskCategories")
+
+	if currentUserRole == "superadmin" {
+		// No filter
+	} else if currentUserRole == "owner_subscriber" {
+		query = query.Where("id = ? OR parent_id = ?", currentUserID, currentUserID)
+	} else {
+		query = query.Where("id = ?", currentUserID)
+	}
+
 	var users []model.User
-	if err := database.DB.Order("id asc").Preload("Devices").Preload("TaskCategories").Find(&users).Error; err != nil {
+	if err := query.Find(&users).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve users",
 		})
@@ -65,23 +79,21 @@ func GetUser(c *fiber.Ctx) error {
 	currentUserID := c.Locals("user_id").(uint64)
 	currentUserRole := c.Locals("role").(string)
 
-	// Authorization check: owner, admin, or user with 'read' permission on 'users' menu
-	if currentUserID != user.ID && currentUserRole != "admin" {
-		var count int64
-		err := database.DB.Model(&model.RoleMenuPermission{}).
-			Joins("JOIN roles ON roles.id = role_menu_permissions.role_id").
-			Joins("JOIN menus ON menus.id = role_menu_permissions.menu_id").
-			Where("roles.name = ? AND menus.key = ? AND role_menu_permissions.can_read = ?", currentUserRole, "users", true).
-			Count(&count).Error
-
-		if err != nil || count == 0 {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "You do not have permission to access this user's details",
-			})
-		}
+	if currentUserRole == "superadmin" {
+		return c.JSON(user)
 	}
 
-	return c.JSON(user)
+	if currentUserID == user.ID {
+		return c.JSON(user)
+	}
+
+	if currentUserRole == "owner_subscriber" && user.ParentID != nil && *user.ParentID == currentUserID {
+		return c.JSON(user)
+	}
+
+	return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+		"error": "You do not have permission to access this user's details",
+	})
 }
 
 // CreateUser handles POST /api/users
@@ -105,11 +117,61 @@ func CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Verify if the role exists
-	var role model.Role
-	if err := database.DB.Where("name = ?", req.Role).First(&role).Error; err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Role does not exist",
+	currentUserID := c.Locals("user_id").(uint64)
+	currentUserRole := c.Locals("role").(string)
+
+	var parentID *uint64
+	var subscriptionTier string = "free"
+	var subscriptionEndsAt *time.Time
+
+	if currentUserRole == "superadmin" {
+		// Superadmin can set whatever they want. Let's make sure the role exists.
+		var role model.Role
+		if err := database.DB.Where("name = ?", req.Role).First(&role).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Role does not exist",
+			})
+		}
+	} else if currentUserRole == "owner_subscriber" {
+		// Force role to admin_subscriber
+		req.Role = "admin_subscriber"
+
+		// Fetch owner to inherit subscription data & check MaxUsers limit
+		var owner model.User
+		if err := database.DB.First(&owner, currentUserID).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to resolve owner details",
+			})
+		}
+
+		// Check active subscription status
+		if !model.IsSubscriptionActive(&owner) {
+			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+				"error": "Masa aktif langganan Anda telah habis. Harap perbarui langganan Anda.",
+			})
+		}
+
+		config := model.GetTierConfig(owner.SubscriptionTier)
+		var activeSubUsersCount int64
+		if err := database.DB.Model(&model.User{}).Where("parent_id = ?", owner.ID).Count(&activeSubUsersCount).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to check current user count limit",
+			})
+		}
+
+		if int(activeSubUsersCount)+1 >= config.MaxUsers {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": fmt.Sprintf("Batas maksimal pengguna (staf) untuk paket %s adalah %d pengguna. Harap tingkatkan (upgrade) paket Anda.", owner.SubscriptionTier, config.MaxUsers),
+			})
+		}
+
+		parentID = &owner.ID
+		subscriptionTier = owner.SubscriptionTier
+		subscriptionEndsAt = owner.SubscriptionEndsAt
+	} else {
+		// admin_subscriber or any other role is not allowed to create users
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "You do not have permission to create users",
 		})
 	}
 
@@ -142,6 +204,9 @@ func CreateUser(c *fiber.Ctx) error {
 		Email:                 req.Email,
 		Password:              string(hashedPassword),
 		Role:                  req.Role,
+		ParentID:              parentID,
+		SubscriptionTier:      subscriptionTier,
+		SubscriptionEndsAt:    subscriptionEndsAt,
 		PhoneNumber:           req.PhoneNumber,
 		IsNotificationEnabled: req.IsNotificationEnabled,
 		CreatedAt:             time.Now(),
@@ -236,44 +301,56 @@ func UpdateUser(c *fiber.Ctx) error {
 	currentUserID := c.Locals("user_id").(uint64)
 	currentUserRole := c.Locals("role").(string)
 
-	// Authorization check: owner, admin, or user with 'update' permission on 'users' menu
-	hasUpdatePermission := false
-	if currentUserRole == "admin" {
-		hasUpdatePermission = true
-	} else {
-		var count int64
-		err := database.DB.Model(&model.RoleMenuPermission{}).
-			Joins("JOIN roles ON roles.id = role_menu_permissions.role_id").
-			Joins("JOIN menus ON menus.id = role_menu_permissions.menu_id").
-			Where("roles.name = ? AND menus.key = ? AND role_menu_permissions.can_update = ?", currentUserRole, "users", true).
-			Count(&count).Error
-		if err == nil && count > 0 {
-			hasUpdatePermission = true
+	// Scope check for non-superadmin
+	if currentUserRole != "superadmin" {
+		if currentUserID != user.ID {
+			if currentUserRole == "owner_subscriber" {
+				if user.ParentID == nil || *user.ParentID != currentUserID {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+						"error": "You do not have permission to update this user",
+					})
+				}
+			} else {
+				// admin_subscriber or other roles cannot update others
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "You do not have permission to update this user",
+				})
+			}
 		}
 	}
 
-	if currentUserID != user.ID && !hasUpdatePermission {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "You do not have permission to update this user's profile",
-		})
-	}
-
-	// Validation: cannot change role unless user has 'update' permission on 'users'
-	if req.Role != "" && req.Role != user.Role && !hasUpdatePermission {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-			"error": "You do not have permission to change user roles",
-		})
-	}
-
-	// If updating role, check if it exists in the database
+	// If updating role, check permissions
 	if req.Role != "" && req.Role != user.Role {
-		var role model.Role
-		if err := database.DB.Where("name = ?", req.Role).First(&role).Error; err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Assigned role does not exist",
+		if currentUserRole == "superadmin" {
+			var role model.Role
+			if err := database.DB.Where("name = ?", req.Role).First(&role).Error; err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "Assigned role does not exist",
+				})
+			}
+			user.Role = req.Role
+		} else if currentUserRole == "owner_subscriber" {
+			// owner_subscriber can only assign admin_subscriber
+			if req.Role != "admin_subscriber" {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "You do not have permission to change user role to something other than admin_subscriber",
+				})
+			}
+			user.Role = "admin_subscriber"
+		} else {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "You do not have permission to change user roles",
 			})
 		}
-		user.Role = req.Role
+	}
+
+	// Keep subscription tier & ends_at inherited from owner if updating a sub-user
+	if user.ParentID != nil {
+		var owner model.User
+		if err := database.DB.First(&owner, *user.ParentID).Error; err == nil {
+			user.SubscriptionTier = owner.SubscriptionTier
+			user.SubscriptionEndsAt = owner.SubscriptionEndsAt
+		}
 	}
 
 	// Update fields if provided
@@ -423,12 +500,30 @@ func DeleteUser(c *fiber.Ctx) error {
 	}
 
 	currentUserID := c.Locals("user_id").(uint64)
+	currentUserRole := c.Locals("role").(string)
 
 	// Self-deletion prevention
 	if user.ID == currentUserID {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "You cannot delete your own account",
 		})
+	}
+
+	// Permission checks
+	if currentUserRole != "superadmin" {
+		if currentUserRole == "owner_subscriber" {
+			// Can only delete their own sub-users
+			if user.ParentID == nil || *user.ParentID != currentUserID {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "You do not have permission to delete this user",
+				})
+			}
+		} else {
+			// admin_subscriber or others cannot delete users
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "You do not have permission to delete users",
+			})
+		}
 	}
 
 	if err := database.DB.Delete(&user).Error; err != nil {
@@ -440,4 +535,91 @@ func DeleteUser(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "User deleted successfully",
 	})
+}
+
+type SubscriptionUpdateRequest struct {
+	Tier string `json:"tier"`
+}
+
+// UpdateSubscription handles PUT /api/users/:uuid/subscription
+func UpdateSubscription(c *fiber.Ctx) error {
+	userUUID := c.Params("uuid")
+	if userUUID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid user UUID",
+		})
+	}
+
+	var req SubscriptionUpdateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cannot parse request body",
+		})
+	}
+
+	tier := strings.ToLower(req.Tier)
+	if tier != "free" && tier != "lite" && tier != "regular" && tier != "pro" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid subscription tier",
+		})
+	}
+
+	var user model.User
+	if err := database.DB.Where("uuid = ?", userUUID).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	currentUserID := c.Locals("user_id").(uint64)
+	currentUserRole := c.Locals("role").(string)
+
+	if currentUserID != user.ID && currentUserRole != "superadmin" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "You do not have permission to modify this user's subscription",
+		})
+	}
+
+	user.SubscriptionTier = tier
+	if tier == "free" {
+		user.SubscriptionEndsAt = nil
+	} else {
+		endsAt := time.Now().AddDate(0, 1, 0)
+		user.SubscriptionEndsAt = &endsAt
+	}
+	user.MessageResetAt = time.Now().AddDate(0, 1, 0)
+	user.MonthlyMessageSent = 0
+
+	tx := database.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update subscription tier",
+		})
+	}
+
+	// Propagate subscription updates to all team members of this user
+	if err := tx.Model(&model.User{}).Where("parent_id = ?", user.ID).Updates(map[string]interface{}{
+		"subscription_tier":    user.SubscriptionTier,
+		"subscription_ends_at": user.SubscriptionEndsAt,
+	}).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to propagate subscription update to team members",
+		})
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to commit transaction",
+		})
+	}
+
+	return c.JSON(user)
 }

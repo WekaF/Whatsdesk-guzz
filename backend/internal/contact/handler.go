@@ -60,7 +60,7 @@ func CreateContact(c *fiber.Ctx) error {
 	// Verify device ownership for non-admin users if a device ID is specified
 	if req.DeviceID != nil {
 		role := c.Locals("role").(string)
-		if role != "admin" {
+		if role != "superadmin" {
 			var count int64
 			err := database.DB.Table("user_devices").Where("user_id = ? AND device_id = ?", userID, *req.DeviceID).Count(&count).Error
 			if err != nil || count == 0 {
@@ -117,7 +117,7 @@ func ListContacts(c *fiber.Ctx) error {
 	}
 
 	query := database.DB.Model(&model.Contact{})
-	if role != "admin" {
+	if role != "superadmin" {
 		query = query.Where("contacts.device_id IN (SELECT device_id FROM user_devices WHERE user_id = ?) OR (contacts.device_id IS NULL AND contacts.user_id = ?)", userID, userID)
 	}
 
@@ -166,7 +166,7 @@ func ListContactGroups(c *fiber.Ctx) error {
 	role := c.Locals("role").(string)
 
 	query := database.DB.Model(&model.Contact{}).Where("\"group\" IS NOT NULL AND \"group\" != ''")
-	if role != "admin" {
+	if role != "superadmin" {
 		query = query.Where("contacts.device_id IN (SELECT device_id FROM user_devices WHERE user_id = ?) OR (contacts.device_id IS NULL AND contacts.user_id = ?)", userID, userID)
 	}
 
@@ -227,7 +227,7 @@ func UpdateContact(c *fiber.Ctx) error {
 	}
 
 	// Verify device ownership for non-admin users if a new device ID is specified
-	if req.DeviceID != nil && role != "admin" {
+	if req.DeviceID != nil && role != "superadmin" {
 		var count int64
 		err := database.DB.Table("user_devices").Where("user_id = ? AND device_id = ?", userID, *req.DeviceID).Count(&count).Error
 		if err != nil || count == 0 {
@@ -240,7 +240,7 @@ func UpdateContact(c *fiber.Ctx) error {
 	// Check if contact exists and belongs to the user
 	var contact model.Contact
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("uuid = ?", contactUUID).First(&contact).Error
 	} else {
 		dbErr = database.DB.Where("uuid = ? AND (device_id IN (SELECT device_id FROM user_devices WHERE user_id = ?) OR (device_id IS NULL AND user_id = ?))", contactUUID, userID, userID).First(&contact).Error
@@ -255,7 +255,7 @@ func UpdateContact(c *fiber.Ctx) error {
 	if phoneDigits != contact.Phone {
 		var duplicate model.Contact
 		var dupErr error
-		if role == "admin" {
+		if role == "superadmin" {
 			dupErr = database.DB.Where("phone = ? AND id != ?", phoneDigits, contact.ID).First(&duplicate).Error
 		} else {
 			dupErr = database.DB.Where("phone = ? AND id != ? AND user_id = ?", phoneDigits, contact.ID, userID).First(&duplicate).Error
@@ -297,7 +297,7 @@ func DeleteContact(c *fiber.Ctx) error {
 	// Check if contact exists and belongs to the user
 	var contact model.Contact
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("uuid = ?", contactUUID).First(&contact).Error
 	} else {
 		dbErr = database.DB.Where("uuid = ? AND (device_id IN (SELECT device_id FROM user_devices WHERE user_id = ?) OR (device_id IS NULL AND user_id = ?))", contactUUID, userID, userID).First(&contact).Error

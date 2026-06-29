@@ -6,7 +6,9 @@ import (
 	"whatapps/backend/internal/autoreply"
 	"whatapps/backend/internal/contact"
 	"whatapps/backend/internal/device"
+	"whatapps/backend/internal/integration"
 	"whatapps/backend/internal/message"
+	"whatapps/backend/internal/payment"
 	"whatapps/backend/internal/role"
 	"whatapps/backend/internal/stats"
 	"whatapps/backend/internal/task"
@@ -26,7 +28,7 @@ func SetupRoutes(app *fiber.App) {
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
 
-	// Serve static uploads
+	// Serve static uploads (both routes)
 	cfg := configs.LoadConfig()
 	app.Static("/uploads", cfg.UploadDir)
 
@@ -38,19 +40,29 @@ func SetupRoutes(app *fiber.App) {
 		})
 	})
 
+	// Inbound Integration Endpoint (Protected by API Key, no JWT)
+	app.Post("/api/v1/integration/send", integration.APIKeyMiddleware(), integration.ApiKeyRateLimiter(), integration.SendIntegrationMessage)
+
 	// Public Routes
 	authGroup := app.Group("/auth")
 	authGroup.Post("/register", auth.Register)
 	authGroup.Post("/login", auth.Login)
 
+	// Webhook callback endpoint for Midtrans (No JWT auth required)
+	app.Post("/api/payments/webhook", payment.HandleWebhook)
+
 	// Protected API Routes
 	apiGroup := app.Group("/api", auth.JWTMiddleware())
+
+	// Payment checkout endpoint (JWT auth required)
+	apiGroup.Post("/payments/checkout", payment.Checkout)
 
 	// Devices Routes
 	devicesGroup := apiGroup.Group("/devices")
 	devicesGroup.Post("/", auth.PermissionMiddleware("devices:create"), device.CreateDevice)
 	devicesGroup.Get("/", auth.PermissionMiddleware("devices:read"), device.ListDevices)
 	devicesGroup.Get("/:uuid", auth.PermissionMiddleware("devices:read"), device.GetDevice)
+	devicesGroup.Post("/:uuid/disconnect", auth.PermissionMiddleware("devices:delete"), device.DisconnectDevice)
 	// devicesGroup.Delete("/:uuid", auth.PermissionMiddleware("devices:delete"), device.DeleteDevice)
 
 	// Messages Routes
@@ -96,17 +108,26 @@ func SetupRoutes(app *fiber.App) {
 	usersGroup.Get("/:uuid", user.GetUser) // Ownership / Read permission handled internally in GetUser
 	usersGroup.Post("/", auth.PermissionMiddleware("users:create"), user.CreateUser)
 	usersGroup.Put("/:uuid", user.UpdateUser) // Ownership / Update permission handled internally in UpdateUser
+	usersGroup.Put("/:uuid/subscription", user.UpdateSubscription)
 	usersGroup.Delete("/:uuid", auth.PermissionMiddleware("users:delete"), user.DeleteUser)
 
 	// Role & Menu/Permission Routes
 	rolesGroup := apiGroup.Group("/roles")
-	rolesGroup.Get("/", auth.PermissionMiddleware("roles:read"), role.ListRoles)
+	rolesGroup.Get("/", auth.PermissionMiddleware([]string{"roles:read", "users:read"}), role.ListRoles)
 	rolesGroup.Get("/:uuid", auth.PermissionMiddleware("roles:read"), role.GetRole)
 	rolesGroup.Post("/", auth.PermissionMiddleware("roles:create"), role.CreateRole)
 	rolesGroup.Put("/:uuid", auth.PermissionMiddleware("roles:update"), role.UpdateRole)
 	rolesGroup.Delete("/:uuid", auth.PermissionMiddleware("roles:delete"), role.DeleteRole)
 	rolesGroup.Get("/:uuid/permissions", auth.PermissionMiddleware("roles:read"), role.GetRolePermissions)
 	rolesGroup.Put("/:uuid/permissions", auth.PermissionMiddleware("roles:update"), role.UpdateRolePermissions)
+
+	// Integrations/API Key CRUD Routes
+	integrationsGroup := apiGroup.Group("/integrations")
+	integrationsGroup.Get("/", auth.PermissionMiddleware("integrasi:read"), integration.ListApiKeys)
+	integrationsGroup.Post("/", auth.PermissionMiddleware("integrasi:create"), integration.CreateApiKey)
+	integrationsGroup.Put("/:uuid/toggle", auth.PermissionMiddleware("integrasi:update"), integration.ToggleApiKeyActive)
+	// integrationsGroup.Delete("/:uuid", auth.PermissionMiddleware("integrasi:delete"), integration.DeleteApiKey)
+	integrationsGroup.Get("/:uuid/logs", auth.PermissionMiddleware("integrasi:read"), integration.GetApiKeyLogs)
 
 	menusGroup := apiGroup.Group("/menus")
 	menusGroup.Get("/", role.ListMenus) // Any logged-in user can fetch menus list

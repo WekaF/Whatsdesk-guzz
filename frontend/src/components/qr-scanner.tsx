@@ -63,7 +63,7 @@ export default function QRScanner({ deviceId, deviceUuid, onClose }: QRScannerPr
         <p className="text-slate-400 text-xs mt-1">Scan the QR code below using WhatsApp Link Devices</p>
       </div>
 
-      <div className="w-64 h-64 relative flex items-center justify-center bg-slate-950/80 rounded-2xl border border-slate-800 shadow-inner overflow-hidden">
+      <div className="w-64 h-64 relative flex items-center justify-center bg-slate-950/80 rounded-lg border border-slate-800 shadow-inner overflow-hidden">
         {status === 'CONNECTING' && (
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="w-8 h-8 text-whatsapp animate-spin" />
@@ -72,7 +72,7 @@ export default function QRScanner({ deviceId, deviceUuid, onClose }: QRScannerPr
         )}
 
         {status === 'SCANNING' && qrCode && (
-          <div className="bg-white p-3 rounded-2xl animate-fade-in shadow-xl">
+          <div className="bg-white p-3 rounded-lg animate-fade-in shadow-xl">
             <img
               src={qrCode}
               alt="WhatsApp Pairing QR Code"
@@ -113,14 +113,14 @@ export default function QRScanner({ deviceId, deviceUuid, onClose }: QRScannerPr
         {status === 'CONNECTED' ? (
           <button
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-whatsapp hover:bg-whatsapp-dark text-black font-semibold text-sm transition-all cursor-pointer glow-green text-center"
+            className="w-full py-2.5 rounded-md bg-whatsapp hover:bg-whatsapp-dark text-black font-semibold text-sm transition-all cursor-pointer glow-green text-center"
           >
             Done
           </button>
         ) : (
           <button
             onClick={onClose}
-            className="w-full py-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 text-slate-300 font-medium text-sm transition-all cursor-pointer text-center"
+            className="w-full py-2.5 rounded-md border border-slate-800 hover:bg-slate-800/40 text-slate-300 font-medium text-sm transition-all cursor-pointer text-center"
           >
             Cancel
           </button>

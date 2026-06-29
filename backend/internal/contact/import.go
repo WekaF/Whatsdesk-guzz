@@ -45,7 +45,7 @@ func ImportWhatsAppContacts(c *fiber.Ctx) error {
 	// Fetch device info to verify user ownership
 	var device model.Device
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("id = ?", req.DeviceID).First(&device).Error
 	} else {
 		dbErr = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").

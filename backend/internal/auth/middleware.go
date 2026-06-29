@@ -79,8 +79,8 @@ func PermissionMiddleware(requiredPermissions ...any) fiber.Handler {
 			})
 		}
 
-		// Admin override: admins can access everything
-		if roleName == "admin" {
+		// Admin override: superadmins can access everything
+		if roleName == "superadmin" {
 			return c.Next()
 		}
 

@@ -29,8 +29,16 @@ type UpdatePermissionsRequest struct {
 
 // ListRoles handles GET /api/roles
 func ListRoles(c *fiber.Ctx) error {
+	roleVal := c.Locals("role")
+	roleName, _ := roleVal.(string)
+
+	query := database.DB.Order("id asc")
+	if roleName != "superadmin" {
+		query = query.Where("name != ?", "superadmin")
+	}
+
 	var roles []model.Role
-	if err := database.DB.Order("id asc").Find(&roles).Error; err != nil {
+	if err := query.Find(&roles).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to retrieve roles",
 		})
@@ -119,10 +127,10 @@ func UpdateRole(c *fiber.Ctx) error {
 	}
 
 	// Prevent renaming core system roles to avoid breaking logic
-	if role.Name == "admin" || role.Name == "user" {
+	if role.Name == "superadmin" || role.Name == "owner_subscriber" || role.Name == "admin_subscriber" {
 		if req.Name != "" && req.Name != role.Name {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Cannot rename system roles 'admin' or 'user'",
+				"error": "Cannot rename system roles 'superadmin', 'owner_subscriber', or 'admin_subscriber'",
 			})
 		}
 	}
@@ -167,9 +175,9 @@ func DeleteRole(c *fiber.Ctx) error {
 	}
 
 	// Prevent deletion of system roles
-	if role.Name == "admin" || role.Name == "user" {
+	if role.Name == "superadmin" || role.Name == "owner_subscriber" || role.Name == "admin_subscriber" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "System roles 'admin' and 'user' cannot be deleted",
+			"error": "System roles 'superadmin', 'owner_subscriber', and 'admin_subscriber' cannot be deleted",
 		})
 	}
 
@@ -254,8 +262,8 @@ func GetRolePermissions(c *fiber.Ctx) error {
 			canUpdate = p.CanUpdate
 			canDelete = p.CanDelete
 		}
-		// Admin always has full access
-		if role.Name == "admin" {
+		// Superadmin always has full access
+		if role.Name == "superadmin" {
 			canCreate, canRead, canUpdate, canDelete = true, true, true, true
 		}
 
@@ -296,10 +304,10 @@ func UpdateRolePermissions(c *fiber.Ctx) error {
 		})
 	}
 
-	// Prevent modification of admin role permissions (admin always has all permissions)
-	if role.Name == "admin" {
+	// Prevent modification of superadmin role permissions (superadmin always has all permissions)
+	if role.Name == "superadmin" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Cannot modify permissions of 'admin' role",
+			"error": "Cannot modify permissions of 'superadmin' role",
 		})
 	}
 
@@ -382,8 +390,8 @@ func GetCurrentUserPermissions(c *fiber.Ctx) error {
 
 	var response []PermissionItemResp
 
-	if roleName == "admin" {
-		// Admin has all permissions on all menus
+	if roleName == "superadmin" {
+		// Superadmin has all permissions on all menus
 		for _, m := range menus {
 			response = append(response, PermissionItemResp{
 				ID:        m.ID,

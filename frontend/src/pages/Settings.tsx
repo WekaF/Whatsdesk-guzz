@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { useStore } from '../store/useStore';
-import { 
-  Users, 
-  Shield, 
-  CheckSquare, 
-  Plus, 
-  Trash2, 
-  Edit2, 
-  Save, 
-  RefreshCw, 
-  X, 
-  ShieldAlert, 
-  Check, 
-  Lock 
+import {
+  Users,
+  Shield,
+  CheckSquare,
+  Plus,
+  Trash2,
+  Edit2,
+  Save,
+  RefreshCw,
+  X,
+  ShieldAlert,
+  Check,
+  Lock
 } from 'lucide-react';
 
 interface DeviceItem {
@@ -61,22 +61,21 @@ interface PermissionItem {
   can_update: boolean;
   can_delete: boolean;
 }
-
 export default function Settings() {
   const { user: currentUser, permissions: userPermissions } = useStore();
-  const isAdmin = currentUser?.role === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin';
+  const isOwner = currentUser?.role === 'owner_subscriber';
 
   // Permissions helpers
   const usersPerm = userPermissions?.find(p => p.key === 'users');
-  const canCreateUser = isAdmin || !!usersPerm?.can_create;
-  const canUpdateUser = isAdmin || !!usersPerm?.can_update;
-  const canDeleteUser = isAdmin || !!usersPerm?.can_delete;
+  const canCreateUser = isSuperAdmin || isOwner || !!usersPerm?.can_create;
+  const canUpdateUser = isSuperAdmin || isOwner || !!usersPerm?.can_update;
+  const canDeleteUser = isSuperAdmin || isOwner || !!usersPerm?.can_delete;
 
   const rolesPerm = userPermissions?.find(p => p.key === 'roles');
-  const canCreateRole = isAdmin || !!rolesPerm?.can_create;
-  const canUpdateRole = isAdmin || !!rolesPerm?.can_update;
-  const canDeleteRole = isAdmin || !!rolesPerm?.can_delete;
-
+  const canCreateRole = isSuperAdmin || !!rolesPerm?.can_create;
+  const canUpdateRole = isSuperAdmin || !!rolesPerm?.can_update;
+  const canDeleteRole = isSuperAdmin || !!rolesPerm?.can_delete;
   const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'permissions'>('users');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -386,10 +385,9 @@ export default function Settings() {
       setLoading(false);
     }
   };
-
   const isSelectedRoleAdmin = () => {
     const roleObj = roles.find(r => r.uuid === selectedRoleUuid);
-    return roleObj?.name === 'admin';
+    return roleObj?.name === 'admin' || roleObj?.name === 'superadmin';
   };
 
   return (
@@ -400,65 +398,65 @@ export default function Settings() {
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">System Settings</h1>
           <p className="text-slate-550 dark:text-slate-400 text-sm">Manage users, roles, and granular menu permissions</p>
         </div>
- 
+
         {/* Tab Selection */}
-        <div className="bg-slate-100 dark:bg-[#111830]/60 p-1 rounded-xl border border-slate-200 dark:border-slate-800 flex self-start shadow-inner">
+        <div className="bg-slate-100 dark:bg-[#111830]/60 p-1 rounded-md border border-slate-200 dark:border-slate-800 flex self-start shadow-inner">
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === 'users' 
-                ? 'bg-whatsapp text-black' 
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'users'
+              ? 'bg-whatsapp text-black'
+              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+              }`}
           >
             <Users className="w-4 h-4" />
             <span>Users</span>
           </button>
-          <button
-            onClick={() => setActiveTab('roles')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === 'roles' 
-                ? 'bg-whatsapp text-black' 
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
-          >
-            <Shield className="w-4 h-4" />
-            <span>Roles</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('permissions')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-              activeTab === 'permissions' 
-                ? 'bg-whatsapp text-black' 
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
-          >
-            <CheckSquare className="w-4 h-4" />
-            <span>Menu Access</span>
-          </button>
+          {isSuperAdmin && (
+            <>
+              <button
+                onClick={() => setActiveTab('roles')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'roles'
+                  ? 'bg-whatsapp text-black'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Roles</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('permissions')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${activeTab === 'permissions'
+                  ? 'bg-whatsapp text-black'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                <span>Menu Access</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
-
       {/* Notifications */}
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-whatsapp text-sm flex items-center gap-2">
+        <div className="p-4 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-whatsapp text-sm flex items-center gap-2">
           <Check className="w-5 h-5 flex-shrink-0" />
           <span>{success}</span>
         </div>
       )}
 
       {/* Main Settings Panel */}
-      <div className="glass-card rounded-2xl p-6 relative overflow-hidden">
-        
+      <div className="glass-card card-accent rounded-lg p-6 relative overflow-hidden">
+
         {/* Tab 1: User Management */}
-        {activeTab === 'users' && (
+        {activeTab === 'users' && (isSuperAdmin || isOwner) && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
@@ -474,7 +472,7 @@ export default function Settings() {
                       nickname: '',
                       email: '',
                       password: '',
-                      role: 'user',
+                      role: isSuperAdmin ? 'owner_subscriber' : 'admin_subscriber',
                       device_ids: [],
                       task_category_uuids: [],
                       phone_number: '',
@@ -482,14 +480,13 @@ export default function Settings() {
                     });
                     setIsAddingUser(true);
                   }}
-                  className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer glow-green shadow"
+                  className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer glow-green shadow"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add User</span>
                 </button>
               )}
             </div>
- 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400 border-collapse">
                 <thead>
@@ -521,14 +518,14 @@ export default function Settings() {
                         )}
                       </td>
                       <td className="py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${
-                          u.role === 'admin' 
-                            ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400' 
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                        }`}>
-                          {u.role}
-                        </span>
-                      </td>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${u.role === 'superadmin'
+                          ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                          : u.role === 'owner_subscriber'
+                            ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                            : 'bg-emerald-500/10 text-whatsapp border border-emerald-500/20'
+                          }`}>
+                          {u.role.replace('_', ' ')}
+                        </span>                      </td>
                       <td className="py-4">
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {u.devices && u.devices.length > 0 ? (
@@ -546,8 +543,8 @@ export default function Settings() {
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {u.task_categories && u.task_categories.length > 0 ? (
                             u.task_categories.map(c => (
-                              <span 
-                                key={c.uuid} 
+                              <span
+                                key={c.uuid}
                                 className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
                                 style={{ backgroundColor: `${c.color}20`, border: `1px solid ${c.color}40`, color: c.color }}
                               >
@@ -598,7 +595,7 @@ export default function Settings() {
         )}
 
         {/* Tab 2: Role Management */}
-        {activeTab === 'roles' && (
+        {activeTab === 'roles' && (isSuperAdmin) && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
@@ -612,14 +609,14 @@ export default function Settings() {
                     setRoleForm({ name: '', description: '' });
                     setIsAddingRole(true);
                   }}
-                  className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer glow-green shadow"
+                  className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer glow-green shadow"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Role</span>
                 </button>
               )}
             </div>
- 
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400 border-collapse">
                 <thead>
@@ -631,7 +628,7 @@ export default function Settings() {
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800/40">
                   {roles.map((r) => {
-                    const isSystem = r.name === 'admin' || r.name === 'user';
+                    const isSystem = r.name === 'admin' || r.name === 'user' || r.name === 'superadmin' || r.name === 'owner_subscriber' || r.name === 'admin_subscriber';
                     return (
                       <tr key={r.id} className="hover:bg-slate-100/50 dark:hover:bg-slate-800/10 transition-all">
                         <td className="py-4 text-slate-900 dark:text-white font-medium flex items-center gap-2">
@@ -677,16 +674,16 @@ export default function Settings() {
         )}
 
         {/* Tab 3: Permissions Config Interface */}
-        {activeTab === 'permissions' && (
+        {activeTab === 'permissions' && isSuperAdmin && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Menu Access Control</h3>
                 <p className="text-xs text-slate-500">Configure CRUD operations allowed for each user role</p>
               </div>
- 
+
               {/* Role Select Dropdown */}
-              <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0d1426] border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl shadow-inner">
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#0d1426] border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-md shadow-inner">
                 <span className="text-xs text-slate-500 uppercase font-semibold">Select Role:</span>
                 <select
                   value={selectedRoleUuid || ''}
@@ -701,9 +698,9 @@ export default function Settings() {
                 </select>
               </div>
             </div>
- 
+
             {selectedRoleUuid && isSelectedRoleAdmin() ? (
-              <div className="p-6 rounded-2xl bg-indigo-50/50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-500/20 text-slate-700 dark:text-slate-300 text-sm space-y-2 shadow-sm">
+              <div className="p-6 rounded-lg bg-indigo-50/50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-500/20 text-slate-700 dark:text-slate-300 text-sm space-y-2 shadow-sm">
                 <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400 font-semibold text-base">
                   <Lock className="w-5 h-5" />
                   <span>Admin Permissions are Hardlocked</span>
@@ -713,7 +710,7 @@ export default function Settings() {
                 </p>
               </div>
             ) : null}
- 
+
             {/* Permissions Matrix Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400 border-collapse">
@@ -779,14 +776,14 @@ export default function Settings() {
                 </tbody>
               </table>
             </div>
- 
+
             {/* Save Button */}
             {!isSelectedRoleAdmin() && canUpdateRole && (
               <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800/40">
                 <button
                   onClick={handleSavePermissions}
                   disabled={loading}
-                  className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-6 py-2.5 rounded-xl transition-all cursor-pointer text-sm font-semibold glow-green shadow"
+                  className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-6 py-2.5 rounded-md transition-all cursor-pointer text-sm font-semibold glow-green shadow"
                 >
                   {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   <span>Save Permissions</span>
@@ -801,7 +798,7 @@ export default function Settings() {
       {/* Add / Edit User Modal */}
       {isAddingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-card rounded-2xl p-6 space-y-6 animate-zoom-in max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md glass-card rounded-lg p-6 space-y-6 animate-zoom-in max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 {editingUser ? 'Edit User details' : 'Register New User'}
@@ -816,7 +813,7 @@ export default function Settings() {
                 <X className="w-5 h-5" />
               </button>
             </div>
- 
+
             <form onSubmit={editingUser ? handleUpdateUser : handleCreateUser} className="space-y-4">
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Name</label>
@@ -826,10 +823,10 @@ export default function Settings() {
                   onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
                   placeholder="e.g. John Doe"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
- 
+
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Nickname / Alias</label>
                 <input
@@ -837,10 +834,10 @@ export default function Settings() {
                   value={userForm.nickname}
                   onChange={(e) => setUserForm({ ...userForm, nickname: e.target.value })}
                   placeholder="e.g. John"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
- 
+
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Email</label>
                 <input
@@ -849,10 +846,10 @@ export default function Settings() {
                   onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                   placeholder="e.g. john@whatapps.com"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
- 
+
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">
                   Password {editingUser ? '(leave blank to keep current)' : ''}
@@ -863,7 +860,7 @@ export default function Settings() {
                   onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                   placeholder={editingUser ? '••••••••' : 'Enter account password'}
                   required={!editingUser}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -875,7 +872,7 @@ export default function Settings() {
                   onChange={(e) => setUserForm({ ...userForm, phone_number: e.target.value })}
                   placeholder="e.g. 628123456789"
                   required={userForm.is_notification_enabled}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -891,25 +888,37 @@ export default function Settings() {
                   Enable Task Notification Broadcasts
                 </label>
               </div>
- 
-              <div>
-                <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Assign Role</label>
-                <select
-                  value={userForm.role}
-                  onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp transition-all text-sm cursor-pointer uppercase"
-                >
-                  {roles.map(r => (
-                    <option key={r.id} value={r.name} className="bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white">
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
- 
+
+              {isSuperAdmin ? (
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Assign Role</label>
+                  <select
+                    value={userForm.role}
+                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                    className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0f172a] text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp transition-all text-sm cursor-pointer uppercase font-semibold"
+                  >
+                    {roles.map(r => (
+                      <option key={r.id} value={r.name} className="bg-white dark:bg-[#0f172a] text-slate-900 dark:text-white">
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Assign Role</label>
+                  <input
+                    type="text"
+                    value="admin_subscriber"
+                    disabled
+                    className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 focus:outline-none transition-all text-sm cursor-not-allowed uppercase font-semibold"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Assign Devices</label>
-                <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2 bg-slate-50/50 dark:bg-slate-900/30">
+                <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-md p-3 space-y-2 bg-slate-50/50 dark:bg-slate-900/30">
                   {devicesList.map(dev => (
                     <label key={dev.id} className="flex items-center gap-2 text-slate-705 dark:text-slate-300 text-sm cursor-pointer hover:text-slate-950 dark:hover:text-white transition-all">
                       <input
@@ -919,7 +928,7 @@ export default function Settings() {
                           const checked = e.target.checked;
                           setUserForm(prev => ({
                             ...prev,
-                            device_ids: checked 
+                            device_ids: checked
                               ? [...prev.device_ids, dev.id]
                               : prev.device_ids.filter(id => id !== dev.id)
                           }));
@@ -934,10 +943,10 @@ export default function Settings() {
                   )}
                 </div>
               </div>
- 
+
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Assign Task Categories</label>
-                <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2 bg-slate-50/50 dark:bg-slate-900/30">
+                <div className="max-h-40 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-md p-3 space-y-2 bg-slate-50/50 dark:bg-slate-900/30">
                   {categoriesList.map(cat => (
                     <label key={cat.uuid} className="flex items-center gap-2 text-slate-705 dark:text-slate-300 text-sm cursor-pointer hover:text-slate-950 dark:hover:text-white transition-all">
                       <input
@@ -947,14 +956,14 @@ export default function Settings() {
                           const checked = e.target.checked;
                           setUserForm(prev => ({
                             ...prev,
-                            task_category_uuids: checked 
+                            task_category_uuids: checked
                               ? [...prev.task_category_uuids, cat.uuid]
                               : prev.task_category_uuids.filter(uuid => uuid !== cat.uuid)
                           }));
                         }}
                         className="w-4 h-4 accent-whatsapp rounded border-slate-350 dark:border-slate-800 bg-white dark:bg-slate-900/50 cursor-pointer"
                       />
-                      <span 
+                      <span
                         className="px-1.5 py-0.5 rounded text-xs font-semibold"
                         style={{ backgroundColor: `${cat.color}20`, border: `1px solid ${cat.color}40`, color: cat.color }}
                       >
@@ -968,19 +977,19 @@ export default function Settings() {
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1">If no categories are assigned, the user will have access to all task categories.</p>
               </div>
- 
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddingUser(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
+                  className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
                 >
                   {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
                   <span>{editingUser ? 'Save Changes' : 'Register'}</span>
@@ -990,11 +999,11 @@ export default function Settings() {
           </div>
         </div>
       )}
- 
+
       {/* Add / Edit Role Modal */}
       {isAddingRole && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-card rounded-2xl p-6 space-y-6 animate-zoom-in max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md glass-card rounded-lg p-6 space-y-6 animate-zoom-in max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 {editingRole ? 'Edit Role Metadata' : 'Create Custom Role'}
@@ -1006,7 +1015,7 @@ export default function Settings() {
                 <X className="w-5 h-5" />
               </button>
             </div>
- 
+
             <form onSubmit={editingRole ? handleUpdateRole : handleCreateRole} className="space-y-4">
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Role Name</label>
@@ -1017,32 +1026,32 @@ export default function Settings() {
                   placeholder="e.g. manager"
                   required
                   disabled={editingRole?.name === 'admin' || editingRole?.name === 'user'}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-805 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed uppercase font-semibold"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-805 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed uppercase font-semibold"
                 />
               </div>
- 
+
               <div>
                 <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Description</label>
                 <textarea
                   value={roleForm.description}
                   onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
                   placeholder="What permissions does this role generally encapsulate?"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-805 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm h-24"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-805 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm h-24"
                 />
               </div>
- 
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsAddingRole(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-655 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-655 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
+                  className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
                 >
                   {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
                   <span>{editingRole ? 'Save Changes' : 'Create'}</span>
