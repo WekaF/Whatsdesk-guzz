@@ -194,8 +194,10 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 					device.Status = "CONNECTED"
 					device.JID = client.Store.ID.String()
 					device.Phone = client.Store.ID.User
-					database.DB.Save(&device)
-					
+					if err := database.DB.Save(&device).Error; err != nil {
+						log.Printf("Failed to save device status for device %d: %v", deviceID, err)
+					}
+
 					// Trigger WS update (to be integrated)
 					PublishWebSocketEvent(deviceID, "device_connected", map[string]interface{}{
 						"device_id": deviceID,
@@ -211,7 +213,9 @@ func (cm *ClientManager) GenerateQR(deviceID uint64, qrChan chan<- string, doneC
 				var device model.Device
 				if err := database.DB.First(&device, deviceID).Error; err == nil {
 					device.Status = "DISCONNECTED"
-					database.DB.Save(&device)
+					if err := database.DB.Save(&device).Error; err != nil {
+						log.Printf("Failed to save device status for device %d: %v", deviceID, err)
+					}
 				}
 				doneChan <- false
 				return
