@@ -2,6 +2,7 @@ package device
 
 import (
 	"errors"
+	"fmt"
 	"time"
 	"whatapps/backend/internal/model"
 	"whatapps/backend/internal/whatsapp"
@@ -16,6 +17,7 @@ type CreateDeviceRequest struct {
 
 func CreateDevice(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(uint64)
+	role := c.Locals("role").(string)
 
 	var req CreateDeviceRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -28,6 +30,40 @@ func CreateDevice(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Device name is required",
 		})
+	}
+
+	// Resolve subscription owner
+	owner, err := database.GetSubscriptionOwner(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to resolve subscription owner account",
+		})
+	}
+
+	// If superadmin, bypass limit checks
+	if role != "superadmin" {
+		// 1. Check subscription active status
+		if !model.IsSubscriptionActive(&owner) {
+			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+				"error": "Masa aktif langganan pemilik akun telah habis. Harap perbarui langganan.",
+			})
+		}
+
+		// 2. Count owner's devices
+		var ownerDevicesCount int64
+		if err := database.DB.Model(&model.UserDevice{}).Where("user_id = ?", owner.ID).Count(&ownerDevicesCount).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to check active devices count",
+			})
+		}
+
+		// Check device limit
+		config := model.GetTierConfig(owner.SubscriptionTier)
+		if int(ownerDevicesCount) >= config.MaxDevices {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": fmt.Sprintf("Batas maksimal perangkat untuk paket %s adalah %d perangkat. Harap tingkatkan (upgrade) paket Anda.", owner.SubscriptionTier, config.MaxDevices),
+			})
+		}
 	}
 
 	tx := database.DB.Begin()
@@ -49,16 +85,30 @@ func CreateDevice(c *fiber.Ctx) error {
 		})
 	}
 
-	userDevice := model.UserDevice{
-		UserID:   userID,
+	// Map to Owner
+	userDeviceOwner := model.UserDevice{
+		UserID:   owner.ID,
 		DeviceID: device.ID,
 	}
-
-	if err := tx.Create(&userDevice).Error; err != nil {
+	if err := tx.Create(&userDeviceOwner).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to map user to device",
+			"error": "Failed to map owner to device",
 		})
+	}
+
+	// Map to Creator (if creator is not the owner)
+	if userID != owner.ID {
+		userDeviceCreator := model.UserDevice{
+			UserID:   userID,
+			DeviceID: device.ID,
+		}
+		if err := tx.Create(&userDeviceCreator).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to map creator to device",
+			})
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
@@ -76,7 +126,7 @@ func ListDevices(c *fiber.Ctx) error {
 
 	var devices []model.Device
 	var err error
-	if role == "admin" {
+	if role == "superadmin" {
 		err = database.DB.Find(&devices).Error
 	} else {
 		err = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").
@@ -106,7 +156,7 @@ func GetDevice(c *fiber.Ctx) error {
 
 	var device model.Device
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("uuid = ?", deviceUUID).First(&device).Error
 	} else {
 		dbErr = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").
@@ -135,7 +185,7 @@ func DeleteDevice(c *fiber.Ctx) error {
 
 	var device model.Device
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("uuid = ?", deviceUUID).First(&device).Error
 	} else {
 		dbErr = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").
@@ -196,4 +246,44 @@ func GetDeviceQR(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"connected": false, "qr": qr})
+}
+
+func DisconnectDevice(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uint64)
+	role := c.Locals("role").(string)
+	deviceUUID := c.Params("uuid")
+
+	if deviceUUID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid device UUID",
+		})
+	}
+
+	var device model.Device
+	var dbErr error
+	if role == "superadmin" {
+		dbErr = database.DB.Where("uuid = ?", deviceUUID).First(&device).Error
+	} else {
+		dbErr = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").
+			Where("devices.uuid = ? AND user_devices.user_id = ?", deviceUUID, userID).
+			First(&device).Error
+	}
+	if dbErr != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "Device not found",
+		})
+	}
+
+	// Call client manager's logout/disconnect logic
+	err := whatsapp.Manager.LogoutDevice(device.ID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fmt.Sprintf("Failed to disconnect device: %v", err),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Device disconnected successfully",
+		"status":  "DISCONNECTED",
+	})
 }

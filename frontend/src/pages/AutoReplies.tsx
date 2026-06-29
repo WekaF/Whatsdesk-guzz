@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { api } from '../services/api';
-import { Plus, Trash2, Edit2, Bot, X, RefreshCw, ShieldAlert, MessageSquare, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, Edit2, Bot, X, RefreshCw, ShieldAlert, MessageSquare, ClipboardList, Link2, Lock } from 'lucide-react';
 
 interface AutoReplyRule {
   id: number;
@@ -10,6 +10,7 @@ interface AutoReplyRule {
   keyword: string;
   match_type: 'EXACT' | 'CONTAINS' | 'START_WITH';
   reply_message: string;
+  webhook_url?: string;
   is_active: boolean;
   create_task: boolean;
   task_category_id?: number;
@@ -27,7 +28,7 @@ interface TaskCategory {
 
 export default function AutoReplies() {
   const { devices, user, permissions } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'superadmin';
   const autoRepliesPerm = permissions?.find(p => p.key === 'auto-replies');
   const canCreate = isAdmin || !!autoRepliesPerm?.can_create;
   const canUpdate = isAdmin || !!autoRepliesPerm?.can_update;
@@ -36,6 +37,17 @@ export default function AutoReplies() {
   const [rules, setRules] = useState<AutoReplyRule[]>([]);
   const [taskCategories, setTaskCategories] = useState<TaskCategory[]>([]);
   const [selectedDeviceFilter, setSelectedDeviceFilter] = useState<number | 'all'>('all');
+
+  const currentTier = user?.subscription_tier?.toLowerCase() || 'free';
+  const tierLimits = {
+    free: 3,
+    lite: 20,
+    regular: 999999,
+    pro: 999999,
+  };
+  const maxRules = isAdmin ? 999999 : (tierLimits[currentTier as keyof typeof tierLimits] || 3);
+  const isRulesLimitReached = rules.length >= maxRules;
+  const hasWebhooks = isAdmin || currentTier === 'regular' || currentTier === 'pro';
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,6 +60,7 @@ export default function AutoReplies() {
   const [formKeyword, setFormKeyword] = useState('');
   const [formMatchType, setFormMatchType] = useState<'EXACT' | 'CONTAINS' | 'START_WITH'>('EXACT');
   const [formReplyMessage, setFormReplyMessage] = useState('');
+  const [formWebhookURL, setFormWebhookURL] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formCreateTask, setFormCreateTask] = useState(false);
   const [formTaskCategoryUUID, setFormTaskCategoryUUID] = useState('');
@@ -91,6 +104,7 @@ export default function AutoReplies() {
     setFormKeyword('');
     setFormMatchType('EXACT');
     setFormReplyMessage('');
+    setFormWebhookURL('');
     setFormIsActive(true);
     setFormCreateTask(false);
     setFormTaskCategoryUUID('');
@@ -107,7 +121,8 @@ export default function AutoReplies() {
     setFormDeviceID(rule.device_id);
     setFormKeyword(rule.keyword);
     setFormMatchType(rule.match_type);
-    setFormReplyMessage(rule.reply_message);
+    setFormReplyMessage(rule.reply_message || '');
+    setFormWebhookURL(rule.webhook_url || '');
     setFormIsActive(rule.is_active);
     setFormCreateTask(rule.create_task || false);
     setFormTaskCategoryUUID(rule.task_category?.uuid || '');
@@ -118,7 +133,7 @@ export default function AutoReplies() {
   // Handle Form Submit (Create / Edit)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formKeyword.trim() || !formReplyMessage.trim() || formDeviceID === 0) {
+    if (!formKeyword.trim() || (!formReplyMessage.trim() && !formWebhookURL.trim()) || formDeviceID === 0) {
       setError('Please fill in all required fields');
       return;
     }
@@ -132,6 +147,7 @@ export default function AutoReplies() {
           keyword: formKeyword,
           match_type: formMatchType,
           reply_message: formReplyMessage,
+          webhook_url: formWebhookURL,
           is_active: formIsActive,
           create_task: formCreateTask,
           ...(formCreateTask ? { task_category_uuid: formTaskCategoryUUID } : {})
@@ -144,6 +160,7 @@ export default function AutoReplies() {
           keyword: formKeyword,
           match_type: formMatchType,
           reply_message: formReplyMessage,
+          webhook_url: formWebhookURL,
           is_active: formIsActive,
           create_task: formCreateTask,
           ...(formCreateTask ? { task_category_uuid: formTaskCategoryUUID } : {})
@@ -192,24 +209,50 @@ export default function AutoReplies() {
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
             <Bot className="w-7 h-7 text-whatsapp" />
             <span>Auto Reply Rules</span>
+            {!isAdmin && (
+              <span className="text-[10px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 px-2 py-0.5 rounded-full text-slate-500 font-bold uppercase tracking-wider">
+                {currentTier} Tier
+              </span>
+            )}
           </h1>
-          <p className="text-slate-550 dark:text-slate-400 text-sm">Configure automatic responses when keywords match incoming messages</p>
+          <p className="text-slate-550 dark:text-slate-400 text-sm">
+            Configure automatic responses when keywords match incoming messages {!isAdmin && `(Usage: ${rules.length} / ${maxRules === 999999 ? 'Unlimited' : maxRules} rules)`}
+          </p>
         </div>
 
         {canCreate && (
           <button
             onClick={handleOpenCreateModal}
-            disabled={devices.length === 0}
-            className="flex items-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2.5 rounded-xl transition-all cursor-pointer text-sm font-semibold glow-green disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={devices.length === 0 || isRulesLimitReached}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-md transition-all text-sm font-semibold shadow-sm ${
+              devices.length === 0 || isRulesLimitReached
+                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                : 'bg-whatsapp hover:bg-emerald-500 text-black cursor-pointer glow-green shadow'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Rule</span>
+            {isRulesLimitReached ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            <span>{isRulesLimitReached ? 'Limit Reached' : 'Add Rule'}</span>
           </button>
         )}
       </div>
 
+      {isRulesLimitReached && !isAdmin && (
+        <div className="p-4 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-slate-700 dark:text-slate-350 text-sm flex items-center justify-between gap-4 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-indigo-500 flex-shrink-0 animate-pulse" />
+            <span>Anda telah mencapai batas maksimal ({maxRules}) aturan auto-reply untuk paket <strong>{currentTier.toUpperCase()}</strong>. Silakan upgrade paket untuk menambahkan lebih banyak aturan.</span>
+          </div>
+          <a
+            href="/billing"
+            className="flex-shrink-0 px-3.5 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-xs font-bold transition-all shadow shadow-indigo-500/15"
+          >
+            Upgrade Paket
+          </a>
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-sm flex items-center gap-2">
+        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-sm flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -218,7 +261,7 @@ export default function AutoReplies() {
       {/* Filter and Content panel */}
       <div className="flex flex-col gap-6">
         {/* Filter Toolbar */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 bg-white dark:bg-slate-900/20 border border-slate-200 dark:border-slate-800/80 p-4 rounded-2xl shadow-sm">
+        <div className="flex flex-col sm:flex-row items-center gap-4 bg-white dark:bg-slate-900/20 border border-slate-200 dark:border-slate-800/80 p-4 rounded-lg shadow-sm">
           <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Filter by Device:</label>
           <select
             value={selectedDeviceFilter}
@@ -226,7 +269,7 @@ export default function AutoReplies() {
               const val = e.target.value;
               setSelectedDeviceFilter(val === 'all' ? 'all' : Number(val));
             }}
-            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-whatsapp min-w-[200px]"
+            className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md px-4 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-whatsapp min-w-[200px]"
           >
             <option value="all">All Devices</option>
             {devices.map(d => (
@@ -242,7 +285,7 @@ export default function AutoReplies() {
             return (
               <div
                 key={rule.id}
-                className={`glass-card rounded-2xl p-6 flex flex-col justify-between space-y-4 border ${
+                className={`glass-card card-accent rounded-lg p-6 flex flex-col justify-between space-y-4 border ${
                   rule.is_active ? 'border-slate-200 dark:border-slate-800 hover:border-whatsapp/30' : 'border-slate-200/50 dark:border-slate-800/40 opacity-70'
                 } transition-all relative overflow-hidden`}
               >
@@ -316,20 +359,30 @@ export default function AutoReplies() {
                   </div>
                 </div>
 
-                {/* Reply Message Box */}
-                <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 flex gap-3 items-start">
-                  <MessageSquare className="w-4 h-4 text-slate-450 dark:text-slate-550 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="text-slate-450 dark:text-slate-550 text-[10px] font-semibold uppercase tracking-wider">Reply message:</span>
-                    <p className="text-slate-800 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">{rule.reply_message}</p>
+                {rule.reply_message && (
+                  <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-md p-4 flex gap-3 items-start">
+                    <MessageSquare className="w-4 h-4 text-slate-450 dark:text-slate-550 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="text-slate-450 dark:text-slate-550 text-[10px] font-semibold uppercase tracking-wider">Reply message:</span>
+                      <p className="text-slate-800 dark:text-slate-300 text-sm whitespace-pre-wrap leading-relaxed">{rule.reply_message}</p>
+                    </div>
                   </div>
-                </div>
+                )}
+                {rule.webhook_url && (
+                  <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-md p-4 flex gap-3 items-start mt-2">
+                    <Link2 className="w-4 h-4 text-whatsapp flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="text-slate-450 dark:text-slate-550 text-[10px] font-semibold uppercase tracking-wider">Webhook URL:</span>
+                      <p className="text-slate-800 dark:text-slate-300 text-xs font-mono break-all leading-normal">{rule.webhook_url}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
 
           {filteredRules.length === 0 && !loading && (
-            <div className="col-span-full py-20 flex flex-col items-center justify-center text-center space-y-4 glass rounded-2xl border border-slate-200 dark:border-slate-800">
+            <div className="col-span-full py-20 flex flex-col items-center justify-center text-center space-y-4 glass rounded-lg border border-slate-200 dark:border-slate-800">
               <Bot className="w-16 h-16 text-slate-400 dark:text-slate-700 animate-pulse" />
               <div className="max-w-sm space-y-2">
                 <h3 className="text-base font-semibold text-slate-800 dark:text-white">No Auto Reply rules found</h3>
@@ -343,7 +396,7 @@ export default function AutoReplies() {
                 canCreate && (
                   <button
                     onClick={handleOpenCreateModal}
-                    className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1e293b]/60 dark:hover:bg-[#1e293b] border border-slate-250 dark:border-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+                    className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#1e293b]/60 dark:hover:bg-[#1e293b] border border-slate-250 dark:border-slate-700 text-slate-800 dark:text-slate-200 px-4 py-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Create first rule</span>
@@ -360,7 +413,7 @@ export default function AutoReplies() {
       {/* Add / Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg glass-card rounded-2xl p-6 space-y-6 animate-zoom-in">
+          <div className="w-full max-w-lg glass-card rounded-lg p-6 space-y-6 animate-zoom-in">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                 <Bot className="w-5 h-5 text-whatsapp" />
@@ -383,7 +436,7 @@ export default function AutoReplies() {
                     value={formDeviceID}
                     onChange={(e) => setFormDeviceID(Number(e.target.value))}
                     disabled={editingRule !== null}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp text-sm disabled:opacity-60"
+                    className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp text-sm disabled:opacity-60"
                   >
                     {devices.map(d => (
                       <option key={d.id} value={d.id}>{d.device_name}</option>
@@ -397,7 +450,7 @@ export default function AutoReplies() {
                   <select
                     value={formMatchType}
                     onChange={(e) => setFormMatchType(e.target.value as any)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp text-sm"
+                    className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp text-sm"
                   >
                     <option value="EXACT">Exact (Keyword matches text exactly)</option>
                     <option value="CONTAINS">Contains (Text contains keyword)</option>
@@ -415,25 +468,58 @@ export default function AutoReplies() {
                   onChange={(e) => setFormKeyword(e.target.value)}
                   placeholder="e.g. price, help, halo"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp text-sm font-mono"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp text-sm font-mono"
                 />
               </div>
 
               {/* Reply message */}
               <div>
-                <label className="block text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Reply Message Template</label>
+                <label className="block text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                  Reply Message Template {!formWebhookURL.trim() && <span className="text-red-500">*</span>}
+                </label>
                 <textarea
                   value={formReplyMessage}
                   onChange={(e) => setFormReplyMessage(e.target.value)}
-                  placeholder="Insert your automatic reply content here. Supports multiple lines..."
+                  placeholder="Insert your automatic reply content here. Optional if Webhook URL is set..."
                   rows={4}
-                  required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp text-sm leading-relaxed"
+                  required={!formWebhookURL.trim()}
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp text-sm leading-relaxed"
                 />
               </div>
 
+              {/* Webhook URL */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-slate-600 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                    Webhook URL (Optional / Sesi Service Desk) {hasWebhooks && !formReplyMessage.trim() && <span className="text-red-500">*</span>}
+                  </label>
+                  {!hasWebhooks && (
+                    <span className="flex items-center gap-1 text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
+                      <Lock className="w-3 h-3" />
+                      <span>Regular / Pro Only</span>
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="url"
+                  value={formWebhookURL}
+                  onChange={(e) => setFormWebhookURL(e.target.value)}
+                  placeholder={hasWebhooks ? "e.g. http://localhost:3000/servicedesk-hook" : "Upgrade ke paket Regular/Pro untuk mengaktifkan integrasi Webhook"}
+                  disabled={!hasWebhooks}
+                  required={hasWebhooks && !formReplyMessage.trim()}
+                  className={`w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp text-sm font-mono ${
+                    !hasWebhooks ? 'cursor-not-allowed opacity-60 bg-slate-100/50 dark:bg-slate-950/20' : ''
+                  }`}
+                />
+                {!hasWebhooks && (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Ingin menggunakan webhook? <a href="/billing" className="text-indigo-400 font-semibold hover:underline">Upgrade ke Regular / Pro sekarang &rarr;</a>
+                  </p>
+                )}
+              </div>
+
               {/* Toggle active & Create Task */}
-              <div className="flex flex-col gap-3 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-850 p-4 rounded-xl">
+              <div className="flex flex-col gap-3 bg-slate-50/50 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-850 p-4 rounded-md">
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -474,7 +560,7 @@ export default function AutoReplies() {
                         value={formTaskCategoryUUID}
                         onChange={(e) => setFormTaskCategoryUUID(e.target.value)}
                         required
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp text-sm"
+                        className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp text-sm"
                       >
                         <option value="">— Select a category —</option>
                         {taskCategories.map(cat => (
@@ -491,14 +577,14 @@ export default function AutoReplies() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
+                  className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
                 >
                   {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
                   <span>{editingRule ? 'Update Rule' : 'Create Rule'}</span>

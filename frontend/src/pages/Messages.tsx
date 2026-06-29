@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { useSearchParams } from 'react-router-dom';
 import { api, connectDeviceWS } from '../services/api';
-import { Send, Smartphone, ArrowDownLeft, ArrowUpRight, ShieldAlert, Check, CheckCheck, HelpCircle, RefreshCw, X, FileText, Download, Eye } from 'lucide-react';
+import { Send, Smartphone, ArrowDownLeft, ArrowUpRight, ShieldAlert, Check, CheckCheck, HelpCircle, RefreshCw, X, FileText, Download, Eye, Paperclip, Image } from 'lucide-react';
 
 export default function Messages() {
   const { devices, user, permissions } = useStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'superadmin';
   const messagesPerm = permissions?.find(p => p.key === 'messages');
   const canSend = isAdmin || !!messagesPerm?.can_create;
   const [messages, setMessages] = useState<any[]>([]);
@@ -17,6 +17,12 @@ export default function Messages() {
   const [sendDeviceId, setSendDeviceId] = useState<string>('');
   const [recipientPhone, setRecipientPhone] = useState<string>('');
   const [messageBody, setMessageBody] = useState<string>('');
+
+  // Attachment states
+  const [attachmentLoading, setAttachmentLoading] = useState(false);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [attachmentFileName, setAttachmentFileName] = useState<string | null>(null);
+  const [attachmentType, setAttachmentType] = useState<'image' | 'document' | null>(null);
 
   // Pre-populate recipient phone from URL query param if present
   useEffect(() => {
@@ -185,9 +191,37 @@ export default function Messages() {
     }
   }, [devices]);
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAttachmentLoading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await api.uploadFile(formData);
+      setAttachmentUrl(res.url);
+      setAttachmentFileName(res.file_name);
+      setAttachmentType(res.message_type);
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload attachment');
+    } finally {
+      setAttachmentLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveAttachment = () => {
+    setAttachmentUrl(null);
+    setAttachmentFileName(null);
+    setAttachmentType(null);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sendDeviceId || !recipientPhone.trim() || !messageBody.trim()) return;
+    if (!sendDeviceId || !recipientPhone.trim() || (!messageBody.trim() && !attachmentUrl)) return;
 
     setSendLoading(true);
     setError(null);
@@ -197,9 +231,13 @@ export default function Messages() {
         device_id: parseInt(sendDeviceId, 10),
         phone: recipientPhone.trim(),
         message: messageBody,
+        message_type: attachmentType || 'text',
+        media_url: attachmentUrl || undefined,
+        file_name: attachmentFileName || undefined,
       });
       setSuccessMsg('Message successfully enqueued for transmission!');
       setMessageBody('');
+      handleRemoveAttachment();
       
       // Reload messages list
       const devId = selectedDeviceFilter ? parseInt(selectedDeviceFilter, 10) : undefined;
@@ -253,7 +291,7 @@ export default function Messages() {
       return (
         <div className="space-y-2 mt-2 max-w-xs">
           <div 
-            className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 cursor-zoom-in group shadow-sm bg-black/5"
+            className="relative rounded-md overflow-hidden border border-slate-200 dark:border-slate-800 cursor-zoom-in group shadow-sm bg-black/5"
             onClick={() => setPreviewImage(imgUrl)}
           >
             <img 
@@ -276,7 +314,7 @@ export default function Messages() {
       const docUrl = msg.media_url?.startsWith('http') ? msg.media_url : `${API_URL}${msg.media_url}`;
       return (
         <div className="space-y-2 mt-2 min-w-[200px] max-w-xs">
-          <div className="p-2.5 rounded-xl border flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800">
+          <div className="p-2.5 rounded-md border flex items-center justify-between gap-3 bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2 min-w-0">
               <div className="p-1.5 rounded-lg bg-red-500/10 text-red-500 flex-shrink-0">
                 <FileText className="w-4 h-4" />
@@ -317,20 +355,20 @@ export default function Messages() {
       {/* Send Message Form */}
       {canSend && (
         <div className="lg:col-span-1 space-y-6">
-        <div className="glass-card rounded-2xl p-6 space-y-6">
+        <div className="glass-card card-accent rounded-lg p-6 space-y-6">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Manual Transmission</h2>
             <p className="text-xs text-slate-550 dark:text-slate-400 mt-1">Send a quick test message using any active device.</p>
           </div>
 
           {error && (
-            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
+            <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
               {error}
             </div>
           )}
 
           {successMsg && (
-            <div className="p-4 rounded-xl bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs font-semibold">
+            <div className="p-4 rounded-md bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs font-semibold">
               {successMsg}
             </div>
           )}
@@ -344,7 +382,7 @@ export default function Messages() {
                   value={sendDeviceId}
                   onChange={(e) => setSendDeviceId(e.target.value)}
                   required
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm appearance-none cursor-pointer"
+                  className="w-full pl-12 pr-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm appearance-none cursor-pointer"
                 >
                   <option value="" disabled>Choose device...</option>
                   {devices.map((d) => (
@@ -364,7 +402,7 @@ export default function Messages() {
                 onChange={(e) => setRecipientPhone(e.target.value)}
                 placeholder="628123456789 (Include country code)"
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm font-mono"
+                className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm font-mono"
               />
             </div>
 
@@ -374,16 +412,68 @@ export default function Messages() {
                 value={messageBody}
                 onChange={(e) => setMessageBody(e.target.value)}
                 placeholder="Write message details..."
-                required
+                required={!attachmentUrl}
                 rows={4}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm resize-none leading-relaxed"
+                className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-655 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm resize-none leading-relaxed"
               />
+            </div>
+
+            <div>
+              <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Attachment (Optional)</label>
+              
+              {!attachmentUrl ? (
+                <div className="relative">
+                  <input
+                    type="file"
+                    id="attachment-input"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    disabled={attachmentLoading}
+                  />
+                  <label
+                    htmlFor="attachment-input"
+                    className="flex items-center justify-center gap-2 w-full py-3 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-md bg-slate-50/20 dark:bg-slate-900/10 text-slate-550 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700 transition-all text-xs font-semibold cursor-pointer select-none"
+                  >
+                    {attachmentLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-whatsapp" />
+                        <span>Uploading attachment...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Paperclip className="w-4.5 h-4.5" />
+                        <span>Add Image or Document</span>
+                      </>
+                    )}
+                  </label>
+                </div>
+              ) : (
+                <div className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`p-1.5 rounded-lg flex-shrink-0 ${attachmentType === 'image' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {attachmentType === 'image' ? <Image className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate text-slate-800 dark:text-slate-200">{attachmentFileName}</p>
+                      <p className="text-[10px] text-slate-500 capitalize">{attachmentType} attachment</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveAttachment}
+                    className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-400 hover:text-slate-750 dark:hover:text-white transition-colors cursor-pointer"
+                    title="Remove Attachment"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
               type="submit"
               disabled={sendLoading || devices.length === 0}
-              className="w-full bg-whatsapp hover:bg-emerald-500 text-black font-semibold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all glow-green cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow"
+              className="w-full bg-whatsapp hover:bg-emerald-500 text-black font-semibold py-3 px-4 rounded-md flex items-center justify-center gap-2 transition-all glow-green cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow"
             >
               <span>{sendLoading ? 'Enqueuing...' : 'Send Message'}</span>
               <Send className="w-4 h-4" />
@@ -395,7 +485,7 @@ export default function Messages() {
 
       {/* Message logs */}
       <div className={canSend ? "lg:col-span-2 space-y-6" : "lg:col-span-3 space-y-6"}>
-        <div className="glass-card rounded-2xl p-6 space-y-6 flex flex-col h-[650px]">
+        <div className="glass-card card-accent rounded-lg p-6 space-y-6 flex flex-col h-[650px]">
           {/* Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -407,7 +497,7 @@ export default function Messages() {
               <select
                 value={selectedDeviceFilter}
                 onChange={(e) => setSelectedDeviceFilter(e.target.value)}
-                className="px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-slate-55 dark:bg-[#0d1428] rounded-xl text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
+                className="px-3 py-2 text-xs border border-slate-200 dark:border-slate-800 bg-slate-55 dark:bg-[#0d1428] rounded-md text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer"
               >
                 <option value="" className="bg-white dark:bg-slate-950 text-slate-800 dark:text-white">All Devices</option>
                 {devices.map((d) => (
@@ -423,7 +513,7 @@ export default function Messages() {
                   fetchMessages(devId);
                 }}
                 disabled={loading}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/30 text-slate-605 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition-all cursor-pointer shadow-sm"
+                className="p-2 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/30 text-slate-605 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition-all cursor-pointer shadow-sm"
                 title="Refresh Logs"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -439,7 +529,7 @@ export default function Messages() {
                 <span className="text-xs text-slate-550">Loading records...</span>
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 space-y-3 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+              <div className="flex flex-col items-center justify-center py-20 space-y-3 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-md">
                 <Send className="w-10 h-10 text-slate-400 dark:text-slate-600" />
                 <span className="text-sm font-semibold text-slate-800 dark:text-white">No messages logged</span>
                 <span className="text-xs text-slate-500 max-w-[200px]">Send a test message above to begin.</span>
@@ -451,7 +541,7 @@ export default function Messages() {
                   return (
                     <div
                       key={msg.id}
-                      className="p-4 rounded-xl bg-slate-50/40 dark:bg-[#0d1428]/30 border border-slate-200 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-slate-100/50 dark:hover:bg-slate-900/30 shadow-sm"
+                      className="p-4 rounded-md bg-slate-50/40 dark:bg-[#0d1428]/30 border border-slate-200 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-slate-100/50 dark:hover:bg-slate-900/30 shadow-sm"
                     >
                       <div className="flex items-start gap-3 min-w-0">
                         {/* Direction Badge */}
@@ -522,7 +612,7 @@ export default function Messages() {
       {/* Add Contact Modal */}
       {isAddContactOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md glass-card rounded-2xl p-6 space-y-6 animate-zoom-in">
+          <div className="w-full max-w-md glass-card rounded-lg p-6 space-y-6 animate-zoom-in">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Save Unsaved Number</h3>
               <button
@@ -534,13 +624,13 @@ export default function Messages() {
             </div>
 
             {contactError && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
+              <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
                 {contactError}
               </div>
             )}
 
             {contactSuccess && (
-              <div className="p-4 rounded-xl bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs flex items-center gap-2 font-semibold">
+              <div className="p-4 rounded-md bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs flex items-center gap-2 font-semibold">
                 <Check className="w-4 h-4" />
                 <span>{contactSuccess}</span>
               </div>
@@ -555,7 +645,7 @@ export default function Messages() {
                   onChange={(e) => setContactFormName(e.target.value)}
                   placeholder="e.g. John Doe"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-650 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -565,7 +655,7 @@ export default function Messages() {
                   type="text"
                   value={contactFormPhone}
                   disabled
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#0d1428]/50 text-slate-500 dark:text-slate-400 focus:outline-none transition-all text-sm font-mono cursor-not-allowed"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-[#0d1428]/50 text-slate-500 dark:text-slate-400 focus:outline-none transition-all text-sm font-mono cursor-not-allowed"
                 />
               </div>
 
@@ -574,7 +664,7 @@ export default function Messages() {
                 <select
                   value={contactFormDeviceId}
                   onChange={(e) => setContactFormDeviceId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
                 >
                   <option value="" className="bg-white dark:bg-slate-950 text-slate-800 dark:text-white">No associated device (Manual)</option>
                   {devices.map((device) => (
@@ -592,7 +682,7 @@ export default function Messages() {
                   value={contactFormGroup}
                   onChange={(e) => setContactFormGroup(e.target.value)}
                   placeholder="e.g. Customers, VIP, Staff"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-655 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-655 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -600,14 +690,14 @@ export default function Messages() {
                 <button
                   type="button"
                   onClick={() => setIsAddContactOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={contactActionLoading}
-                  className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
+                  className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
                 >
                   <span>{contactActionLoading ? 'Saving...' : 'Save Contact'}</span>
                 </button>
@@ -623,11 +713,11 @@ export default function Messages() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
           onClick={() => setPreviewImage(null)}
         >
-          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-2xl animate-zoom-in" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-lg border border-slate-800/80 bg-slate-950 shadow-2xl animate-zoom-in" onClick={(e) => e.stopPropagation()}>
             <img src={previewImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain" />
             <button 
               onClick={() => setPreviewImage(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl bg-black/60 text-white hover:bg-black/80 hover:text-whatsapp transition-colors cursor-pointer"
+              className="absolute top-4 right-4 p-2 rounded-md bg-black/60 text-white hover:bg-black/80 hover:text-whatsapp transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

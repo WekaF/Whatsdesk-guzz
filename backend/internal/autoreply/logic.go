@@ -80,6 +80,7 @@ func MatchAndTriggerReply(deviceID uint64, incomingMsg *model.Message) {
 						TriggerMsg: incomingMsg.Message,
 						Status:     "Open",
 						CategoryID: rule.TaskCategoryID,
+						WebhookURL: rule.WebhookURL,
 						CreatedAt:  time.Now(),
 						UpdatedAt:  time.Now(),
 					}
@@ -165,42 +166,44 @@ func MatchAndTriggerReply(deviceID uint64, incomingMsg *model.Message) {
 				database.DB.Create(&taskInMsg)
 			}
 
-			// 2. Create outgoing message
-			msg := model.Message{
-				DeviceID:  deviceID,
-				Direction: "OUT",
-				Phone:     incomingMsg.Phone,
-				Message:   rule.ReplyMessage,
-				Status:    "PENDING",
-				TaskID:    taskID,
-				CreatedAt: time.Now(),
-			}
-
-			if err := database.DB.Create(&msg).Error; err != nil {
-				log.Printf("[AutoReply] Failed to save auto-reply message: %v", err)
-				return
-			}
-
-			// Log the outgoing message to task messages
-			if taskID != nil {
-				taskOutMsg := model.TaskMessage{
-					TaskID:    *taskID,
+			// 2. Create outgoing message (only if ReplyMessage is not empty)
+			if rule.ReplyMessage != "" {
+				msg := model.Message{
+					DeviceID:  deviceID,
 					Direction: "OUT",
+					Phone:     incomingMsg.Phone,
 					Message:   rule.ReplyMessage,
+					Status:    "PENDING",
+					TaskID:    taskID,
 					CreatedAt: time.Now(),
 				}
-				database.DB.Create(&taskOutMsg)
-			}
 
-			// 3. Enqueue to Redis queue for asynchronous delivery
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			err := rdb.EnqueueMessage(ctx, msg.ID)
-			cancel()
+				if err := database.DB.Create(&msg).Error; err != nil {
+					log.Printf("[AutoReply] Failed to save auto-reply message: %v", err)
+					return
+				}
 
-			if err != nil {
-				log.Printf("[AutoReply] Failed to enqueue auto-reply message ID %d: %v", msg.ID, err)
-				msg.Status = "FAILED"
-				database.DB.Save(&msg)
+				// Log the outgoing message to task messages
+				if taskID != nil {
+					taskOutMsg := model.TaskMessage{
+						TaskID:    *taskID,
+						Direction: "OUT",
+						Message:   rule.ReplyMessage,
+						CreatedAt: time.Now(),
+					}
+					database.DB.Create(&taskOutMsg)
+				}
+
+				// 3. Enqueue to Redis queue for asynchronous delivery
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				err := rdb.EnqueueMessage(ctx, msg.ID)
+				cancel()
+
+				if err != nil {
+					log.Printf("[AutoReply] Failed to enqueue auto-reply message ID %d: %v", msg.ID, err)
+					msg.Status = "FAILED"
+					database.DB.Save(&msg)
+				}
 			}
 
 			// Stop checking after the first match to avoid multiple replies

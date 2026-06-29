@@ -79,6 +79,7 @@ export const api = {
   createDevice: (name: string) => request<any>('/api/devices', { method: 'POST', body: JSON.stringify({ device_name: name }) }),
   deleteDevice: (uuid: string) => request<any>(`/api/devices/${uuid}`, { method: 'DELETE' }),
   getDevice: (uuid: string) => request<any>(`/api/devices/${uuid}`),
+  disconnectDevice: (uuid: string) => request<any>(`/api/devices/${uuid}/disconnect`, { method: 'POST' }),
 
   // Messages
   sendMessage: (data: { 
@@ -123,9 +124,9 @@ export const api = {
   // Auto Replies
   listAutoReplies: (deviceId?: number) => 
     request<any[]>(`/api/auto-replies${deviceId ? `?device_id=${deviceId}` : ''}`),
-  createAutoReply: (data: { device_id: number; keyword: string; match_type: string; reply_message: string; is_active?: boolean; create_task?: boolean; task_category_uuid?: string }) => 
+  createAutoReply: (data: { device_id: number; keyword: string; match_type: string; reply_message: string; webhook_url?: string; is_active?: boolean; create_task?: boolean; task_category_uuid?: string }) => 
     request<any>('/api/auto-replies', { method: 'POST', body: JSON.stringify(data) }),
-  updateAutoReply: (uuid: string, data: { keyword?: string; match_type?: string; reply_message?: string; is_active?: boolean; create_task?: boolean; task_category_uuid?: string }) => 
+  updateAutoReply: (uuid: string, data: { keyword?: string; match_type?: string; reply_message?: string; webhook_url?: string; is_active?: boolean; create_task?: boolean; task_category_uuid?: string }) => 
     request<any>(`/api/auto-replies/${uuid}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteAutoReply: (uuid: string) => 
     request<any>(`/api/auto-replies/${uuid}`, { method: 'DELETE' }),
@@ -189,6 +190,8 @@ export const api = {
   getUser: (uuid: string) => request<any>(`/api/users/${uuid}`),
   createUser: (data: any) => request<any>('/api/users', { method: 'POST', body: JSON.stringify(data) }),
   updateUser: (uuid: string, data: any) => request<any>(`/api/users/${uuid}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateSubscription: (uuid: string, tier: string) => request<any>(`/api/users/${uuid}/subscription`, { method: 'PUT', body: JSON.stringify({ tier }) }),
+  createCheckout: (tier: string) => request<any>('/api/payments/checkout', { method: 'POST', body: JSON.stringify({ tier }) }),
   deleteUser: (uuid: string) => request<any>(`/api/users/${uuid}`, { method: 'DELETE' }),
 
   // Role Management
@@ -207,6 +210,22 @@ export const api = {
 
   // Token refresh
   refreshToken: () => tryRefreshToken(),
+
+  // Integrations (API Keys)
+  listApiKeys: () => request<any[]>('/api/integrations'),
+  createApiKey: (data: { name: string; device_id: number; allowed_ips?: string; expires_at?: string | null }) =>
+    request<any>('/api/integrations', { method: 'POST', body: JSON.stringify(data) }),
+  toggleApiKey: (uuid: string) =>
+    request<any>(`/api/integrations/${uuid}/toggle`, { method: 'PUT' }),
+  deleteApiKey: (uuid: string) =>
+    request<any>(`/api/integrations/${uuid}`, { method: 'DELETE' }),
+  getApiKeyLogs: (uuid: string, page: number = 1, limit: number = 10, search?: string) => {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    if (search) params.append('q', search);
+    return request<any>(`/api/integrations/${uuid}/logs?${params.toString()}`);
+  },
 };
 
 export function getTokenExpiryUnix(token: string): number | null {

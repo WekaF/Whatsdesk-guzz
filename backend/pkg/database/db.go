@@ -93,6 +93,7 @@ func InitDB(cfg *configs.Config) *gorm.DB {
 		&model.User{},
 		&model.UserDevice{},
 		&model.Device{},
+		&model.ApiKey{},
 		&model.Message{},
 		&model.Broadcast{},
 		&model.BroadcastDetail{},
@@ -103,6 +104,7 @@ func InitDB(cfg *configs.Config) *gorm.DB {
 		&model.Task{},
 		&model.TaskMessage{},
 		&model.TaskLog{},
+		&model.Transaction{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to run database migrations: %v", err)
@@ -202,7 +204,7 @@ func seedAdminUser(db *gorm.DB) {
 			Name:     "Admin User",
 			Email:    "admin@whatapps.com",
 			Password: string(hashedPassword),
-			Role:     "admin",
+			Role:     "superadmin",
 		}
 		if err := db.Create(&admin).Error; err != nil {
 			log.Printf("Failed to seed admin user: %v", err)
@@ -213,20 +215,35 @@ func seedAdminUser(db *gorm.DB) {
 }
 
 func seedRolesMenusAndPermissions(db *gorm.DB) {
+	// Migration check: rename 'admin' to 'superadmin' and 'user' to 'owner_subscriber'
+	db.Exec("UPDATE users SET role = 'superadmin' WHERE role = 'admin'")
+	db.Exec("UPDATE roles SET name = 'superadmin', description = 'Superadmin with full system control' WHERE name = 'admin'")
+	db.Exec("UPDATE users SET role = 'owner_subscriber' WHERE role = 'user'")
+	db.Exec("UPDATE roles SET name = 'owner_subscriber', description = 'Owner of the subscription with team management capability' WHERE name = 'user'")
+
 	// 1. Seed Roles
 	var rolesCount int64
 	db.Model(&model.Role{}).Count(&rolesCount)
-	if rolesCount == 0 {
+	// Check if admin_subscriber is missing, if so seed or verify
+	var adminSubExists int64
+	db.Model(&model.Role{}).Where("name = ?", "admin_subscriber").Count(&adminSubExists)
+
+	if rolesCount == 0 || adminSubExists == 0 {
 		roles := []model.Role{
-			{Name: "admin", Description: "Administrator with full system control"},
-			{Name: "user", Description: "Standard user with access to messaging features"},
+			{Name: "superadmin", Description: "Superadmin with full system control"},
+			{Name: "owner_subscriber", Description: "Owner of the subscription with team management capability"},
+			{Name: "admin_subscriber", Description: "Admin of the subscription with access to gateway features"},
 		}
 		for _, r := range roles {
-			if err := db.Create(&r).Error; err != nil {
-				log.Printf("Failed to seed role %s: %v", r.Name, err)
+			var exists int64
+			db.Model(&model.Role{}).Where("name = ?", r.Name).Count(&exists)
+			if exists == 0 {
+				if err := db.Create(&r).Error; err != nil {
+					log.Printf("Failed to seed role %s: %v", r.Name, err)
+				}
 			}
 		}
-		log.Println("Roles table seeded successfully")
+		log.Println("Roles table seeded/updated successfully")
 	}
 
 	// 2. Seed Menus
@@ -241,6 +258,7 @@ func seedRolesMenusAndPermissions(db *gorm.DB) {
 		{Name: "User Management", Key: "users", Path: "/users", Icon: "users", SortOrder: 8},
 		{Name: "Role Management", Key: "roles", Path: "/roles", Icon: "shield-check", SortOrder: 9},
 		{Name: "Task List", Key: "task-list", Path: "/task-list", Icon: "list-todo", SortOrder: 10},
+		{Name: "Integrasi", Key: "integrasi", Path: "/integrasi", Icon: "key-round", SortOrder: 11},
 	}
 
 	for _, dm := range defaultMenus {
@@ -264,43 +282,63 @@ func seedRolesMenusAndPermissions(db *gorm.DB) {
 	log.Println("Menus table dynamic seeding completed")
 
 	// 3. Seed Permissions
-	var adminRole, userRole model.Role
-	db.Where("name = ?", "admin").First(&adminRole)
-	db.Where("name = ?", "user").First(&userRole)
+	var superadminRole, ownerRole, adminSubRole model.Role
+	db.Where("name = ?", "superadmin").First(&superadminRole)
+	db.Where("name = ?", "owner_subscriber").First(&ownerRole)
+	db.Where("name = ?", "admin_subscriber").First(&adminSubRole)
 
 	var menus []model.Menu
 	db.Find(&menus)
 
 	for _, m := range menus {
-		// Admin gets full CRUD access
-		var adminPermCount int64
-		db.Model(&model.RoleMenuPermission{}).Where("role_id = ? AND menu_id = ?", adminRole.ID, m.ID).Count(&adminPermCount)
-		if adminPermCount == 0 {
-			adminPerm := model.RoleMenuPermission{
-				RoleID:    adminRole.ID,
-				MenuID:    m.ID,
-				CanCreate: true,
-				CanRead:   true,
-				CanUpdate: true,
-				CanDelete: true,
-			}
-			db.Create(&adminPerm)
-		}
-
-		// User gets full access (except for users and roles)
-		if m.Key != "users" && m.Key != "roles" {
-			var userPermCount int64
-			db.Model(&model.RoleMenuPermission{}).Where("role_id = ? AND menu_id = ?", userRole.ID, m.ID).Count(&userPermCount)
-			if userPermCount == 0 {
-				userPerm := model.RoleMenuPermission{
-					RoleID:    userRole.ID,
+		// Superadmin gets full CRUD access
+		if superadminRole.ID != 0 {
+			var adminPermCount int64
+			db.Model(&model.RoleMenuPermission{}).Where("role_id = ? AND menu_id = ?", superadminRole.ID, m.ID).Count(&adminPermCount)
+			if adminPermCount == 0 {
+				adminPerm := model.RoleMenuPermission{
+					RoleID:    superadminRole.ID,
 					MenuID:    m.ID,
 					CanCreate: true,
 					CanRead:   true,
 					CanUpdate: true,
 					CanDelete: true,
 				}
-				db.Create(&userPerm)
+				db.Create(&adminPerm)
+			}
+		}
+
+		// Owner Subscriber gets access to all menus except roles
+		if ownerRole.ID != 0 && m.Key != "roles" {
+			var ownerPermCount int64
+			db.Model(&model.RoleMenuPermission{}).Where("role_id = ? AND menu_id = ?", ownerRole.ID, m.ID).Count(&ownerPermCount)
+			if ownerPermCount == 0 {
+				ownerPerm := model.RoleMenuPermission{
+					RoleID:    ownerRole.ID,
+					MenuID:    m.ID,
+					CanCreate: true,
+					CanRead:   true,
+					CanUpdate: true,
+					CanDelete: true,
+				}
+				db.Create(&ownerPerm)
+			}
+		}
+
+		// Admin Subscriber gets access to all menus except users and roles
+		if adminSubRole.ID != 0 && m.Key != "users" && m.Key != "roles" {
+			var adminSubPermCount int64
+			db.Model(&model.RoleMenuPermission{}).Where("role_id = ? AND menu_id = ?", adminSubRole.ID, m.ID).Count(&adminSubPermCount)
+			if adminSubPermCount == 0 {
+				adminSubPerm := model.RoleMenuPermission{
+					RoleID:    adminSubRole.ID,
+					MenuID:    m.ID,
+					CanCreate: true,
+					CanRead:   true,
+					CanUpdate: true,
+					CanDelete: true,
+				}
+				db.Create(&adminSubPerm)
 			}
 		}
 	}
@@ -331,4 +369,19 @@ func ResolveRealPhone(incomingJID string) string {
 	}
 	return clean
 }
+
+func GetSubscriptionOwner(userID uint64) (model.User, error) {
+	var u model.User
+	if err := DB.First(&u, userID).Error; err != nil {
+		return u, err
+	}
+	if u.Role == "admin_subscriber" && u.ParentID != nil {
+		var parent model.User
+		if err := DB.First(&parent, *u.ParentID).Error; err == nil {
+			return parent, nil
+		}
+	}
+	return u, nil
+}
+
 

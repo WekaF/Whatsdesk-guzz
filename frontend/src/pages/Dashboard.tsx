@@ -108,31 +108,15 @@ export default function Dashboard() {
     if (!user) return;
     setTasksLoading(true);
     try {
-      // Fetch my tasks (all statuses, limit 100)
       const myTasksResp = await api.listTasks(
-        undefined, // status
-        undefined, // device_id
-        1,         // page
-        100,       // limit
-        undefined, // category_uuid
-        user.id.toString(), // updated_by
-        undefined, // unassigned
-        start,     // start_date
-        end        // end_date
+        undefined, undefined, 1, 100, undefined,
+        user.id.toString(), undefined, start, end
       );
       setMyTasks(myTasksResp.data || []);
 
-      // Fetch unassigned open tasks
       const unassignedResp = await api.listTasks(
-        'Open',     // status Open
-        undefined,  // device_id
-        1,          // page
-        100,        // limit
-        undefined,  // category_uuid
-        undefined,  // updated_by
-        true,       // unassigned = true
-        start,      // start_date
-        end         // end_date
+        'Open', undefined, 1, 100, undefined,
+        undefined, true, start, end
       );
       setUnassignedTasks(unassignedResp.data || []);
     } catch (err) {
@@ -174,8 +158,6 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboardData();
     fetchQueueStats();
-
-    // Auto-refresh queue stats every 10 seconds
     intervalRef.current = setInterval(fetchQueueStats, 10000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -191,10 +173,9 @@ export default function Dashboard() {
     fetchDashboardTasks(startDate, endDate);
   }, [startDate, endDate]);
 
-  // Load user list based on roles
   useEffect(() => {
     if (!user) return;
-    if (user.role === 'admin') {
+    if (user.role === 'superadmin' || user.role === 'owner_subscriber') {
       const fetchUsers = async () => {
         try {
           const uList = await api.listUsers();
@@ -214,7 +195,6 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // Load tasks for the selected user
   useEffect(() => {
     if (!selectedUser) {
       setSelectedUserTasks([]);
@@ -224,12 +204,8 @@ export default function Dashboard() {
       setSelectedTasksLoading(true);
       try {
         const resp = await api.listTasks(
-          undefined, // status
-          undefined, // device_id
-          1,         // page
-          100,       // limit
-          undefined, // category_uuid
-          selectedUser.id.toString() // updated_by
+          undefined, undefined, 1, 100, undefined,
+          selectedUser.id.toString()
         );
         setSelectedUserTasks(resp.data || []);
       } catch (err) {
@@ -242,11 +218,10 @@ export default function Dashboard() {
     fetchSelectedUserTasks();
   }, [selectedUser]);
 
-
   const applyDateRange = (type: string) => {
     setDateRangeType(type);
     const today = new Date();
-    
+
     const formatDate = (date: Date) => {
       const yyyy = date.getFullYear();
       const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -332,12 +307,12 @@ export default function Dashboard() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">System Dashboard</h1>
-          <p className="text-slate-600 dark:text-slate-400 text-sm">Realtime metrics and status logs</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Realtime metrics and status logs</p>
         </div>
         <button
           onClick={() => { fetchDashboardData(); fetchQueueStats(); }}
           disabled={loading}
-          className="flex items-center gap-2 bg-slate-100 dark:bg-[#1e293b]/40 hover:bg-slate-200 dark:hover:bg-[#1e293b]/80 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl transition-all cursor-pointer text-sm font-medium"
+          className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/40 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-md transition-all cursor-pointer text-sm font-medium"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
@@ -345,18 +320,35 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
-            <div key={idx} className={`glass-card rounded-2xl p-6 flex items-center justify-between ${stat.glow || ''}`}>
-              <div>
-                <p className="text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">{stat.label}</p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">{stat.value}</p>
+            <div key={idx} className={`glass-card rounded-lg p-5 flex items-center justify-between relative overflow-hidden border border-slate-200 dark:border-slate-800/80 shadow-sm transition-all hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700`}>
+              <div className="relative z-10">
+                <p className="text-slate-500 dark:text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">{stat.label}</p>
+                <p className="text-3xl font-extrabold text-slate-900 dark:text-white mt-2 tracking-tight title-tracking">{stat.value}</p>
+
+                {/* Asymmetric mock indicator line to make it look custom designed */}
+                <div className="h-1 w-12 bg-slate-200 dark:bg-slate-800 rounded-full mt-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${idx === 0 ? 'bg-blue-500' :
+                        idx === 1 ? 'bg-emerald-500' :
+                          idx === 2 ? 'bg-purple-500' : 'bg-orange-500'
+                      }`}
+                    style={{ width: stat.value > 0 ? '70%' : '15%' }}
+                  />
+                </div>
               </div>
-              <div className={`p-3 rounded-xl ${stat.bgColor} border ${stat.borderColor} ${stat.iconColor}`}>
-                <Icon className="w-6 h-6" />
+              <div className={`p-2.5 rounded-md ${stat.bgColor} border ${stat.borderColor} ${stat.iconColor} relative z-10 flex-shrink-0`}>
+                <Icon className="w-5 h-5" />
               </div>
+
+              {/* Elegant ambient light gradient backings */}
+              <div className={`absolute -right-6 -bottom-6 w-16 h-16 rounded-full blur-[24px] pointer-events-none opacity-20 dark:opacity-10 ${idx === 0 ? 'bg-blue-500' :
+                  idx === 1 ? 'bg-emerald-500' :
+                    idx === 2 ? 'bg-purple-500' : 'bg-orange-500'
+                }`} />
             </div>
           );
         })}
@@ -364,10 +356,10 @@ export default function Dashboard() {
 
       {/* Ticket Status Grid */}
       {taskStats && (
-        <div className={`glass-card rounded-2xl p-6 space-y-6 relative transition-opacity duration-300 ${statsLoading ? 'opacity-65 pointer-events-none' : ''}`}>
+        <div className={`glass-card card-accent-indigo rounded-lg p-6 space-y-5 relative transition-opacity duration-300 ${statsLoading ? 'opacity-65 pointer-events-none' : ''}`}>
           {statsLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-2xl z-10">
-              <RefreshCw className="w-6 h-6 text-indigo-650 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-lg z-10">
+              <RefreshCw className="w-5 h-5 text-indigo-600 animate-spin" />
             </div>
           )}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
@@ -389,8 +381,7 @@ export default function Dashboard() {
 
             {/* Date Filters */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Quick Select Buttons */}
-              <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-950/40 p-0.5 border border-slate-200 dark:border-slate-800/60">
+              <div className="inline-flex rounded-md bg-slate-100 dark:bg-slate-900/50 p-0.5 border border-slate-200 dark:border-slate-700/40">
                 {[
                   { label: 'All', type: 'all' },
                   { label: 'Today', type: 'today' },
@@ -403,32 +394,30 @@ export default function Dashboard() {
                   <button
                     key={opt.type}
                     onClick={() => applyDateRange(opt.type)}
-                    className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all cursor-pointer ${
-                      dateRangeType === opt.type
-                        ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-sm'
+                    className={`px-2.5 py-1 text-[10px] font-semibold rounded transition-all cursor-pointer ${dateRangeType === opt.type
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
 
-              {/* Custom Date Inputs */}
               {dateRangeType === 'custom' && (
-                <div className="flex items-center gap-1.5 animate-fadeIn">
+                <div className="flex items-center gap-1.5 animate-fade-in">
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="bg-slate-50 dark:bg-[#090e1a]/60 border border-slate-200 dark:border-slate-800 text-[10px] rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+                    className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/40 text-[10px] rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
                   />
                   <span className="text-[10px] text-slate-400 font-semibold">to</span>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="bg-slate-50 dark:bg-[#090e1a]/60 border border-slate-200 dark:border-slate-800 text-[10px] rounded-lg px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+                    className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/40 text-[10px] rounded-md px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               )}
@@ -436,28 +425,28 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="bg-blue-50/40 dark:bg-[#0d1428]/60 border border-blue-100 dark:border-blue-950/40 rounded-xl p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="bg-blue-50/40 dark:bg-slate-900/40 border border-blue-100 dark:border-blue-950/40 rounded-md p-3.5">
                 <p className="text-[10px] font-bold text-blue-600/80 dark:text-blue-400 uppercase tracking-wider">Total Tickets</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{taskStats.total}</p>
               </div>
-              <div className="bg-emerald-50/40 dark:bg-[#0d1428]/60 border border-emerald-100 dark:border-emerald-950/40 rounded-xl p-4">
+              <div className="bg-emerald-50/40 dark:bg-slate-900/40 border border-emerald-100 dark:border-emerald-950/40 rounded-md p-3.5">
                 <p className="text-[10px] font-bold text-emerald-600/80 dark:text-emerald-400 uppercase tracking-wider">Open</p>
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{taskStats.open}</p>
               </div>
-              <div className="bg-amber-50/40 dark:bg-[#0d1428]/60 border border-amber-100 dark:border-amber-950/40 rounded-xl p-4">
+              <div className="bg-amber-50/40 dark:bg-slate-900/40 border border-amber-100 dark:border-amber-950/40 rounded-md p-3.5">
                 <p className="text-[10px] font-bold text-amber-600/80 dark:text-amber-400 uppercase tracking-wider">In Progress</p>
-                <p className="text-2xl font-bold text-amber-600 dark:text-amber-450 mt-1">{taskStats.in_progress}</p>
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{taskStats.in_progress}</p>
               </div>
-              <div className="bg-blue-50/40 dark:bg-[#0d1428]/60 border border-blue-100 dark:border-blue-950/40 rounded-xl p-4">
+              <div className="bg-blue-50/40 dark:bg-slate-900/40 border border-blue-100 dark:border-blue-950/40 rounded-md p-3.5">
                 <p className="text-[10px] font-bold text-blue-600/80 dark:text-blue-400 uppercase tracking-wider">On Hold</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{taskStats.on_hold}</p>
               </div>
-              <div className="bg-blue-50/40 dark:bg-[#0d1428]/60 border border-blue-100 dark:border-blue-950/40 rounded-xl p-4">
+              <div className="bg-blue-50/40 dark:bg-slate-900/40 border border-blue-100 dark:border-blue-950/40 rounded-md p-3.5">
                 <p className="text-[10px] font-bold text-blue-600/80 dark:text-blue-400 uppercase tracking-wider">Resolved</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">{taskStats.resolved}</p>
               </div>
-              <div className="bg-slate-50 dark:bg-[#0d1428]/60 border border-slate-200 dark:border-slate-800/60 rounded-xl p-4">
+              <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/40 rounded-md p-3.5">
                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Closed</p>
                 <p className="text-2xl font-bold text-slate-700 dark:text-slate-300 mt-1">{taskStats.closed}</p>
               </div>
@@ -466,45 +455,45 @@ export default function Dashboard() {
 
           {/* Status Overview by Category */}
           {taskStats.categories && taskStats.categories.length > 0 && (
-            <div className="pt-6 border-t border-slate-200 dark:border-slate-800/80 space-y-4">
+            <div className="pt-5 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
               <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Breakdown by Category</h4>
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800/60 bg-slate-50/20 dark:bg-[#090e1a]/30">
+              <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-700/40 bg-slate-50/20 dark:bg-slate-900/20">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800/60 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-[#0d1428]/40">
-                      <th className="py-3 px-4">Category Name</th>
-                      <th className="py-3 px-4 text-center">Total Tasks</th>
-                      <th className="py-3 px-4 text-center">Open</th>
-                      <th className="py-3 px-4 text-center">In Progress</th>
-                      <th className="py-3 px-4 text-center">On Hold</th>
-                      <th className="py-3 px-4 text-center">Closed</th>
+                    <tr className="border-b border-slate-200 dark:border-slate-700/40 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
+                      <th className="py-2.5 px-4">Category Name</th>
+                      <th className="py-2.5 px-4 text-center">Total Tasks</th>
+                      <th className="py-2.5 px-4 text-center">Open</th>
+                      <th className="py-2.5 px-4 text-center">In Progress</th>
+                      <th className="py-2.5 px-4 text-center">On Hold</th>
+                      <th className="py-2.5 px-4 text-center">Closed</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700/40">
                     {taskStats.categories.map((cat, idx) => (
-                      <tr key={idx} className="text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50/40 dark:hover:bg-slate-900/30 transition-colors">
-                        <td className="py-3 px-4 font-semibold flex items-center gap-2.5">
-                          <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10 dark:border-white/10" style={{ backgroundColor: cat.color }} />
+                      <tr key={idx} className="text-xs text-slate-700 dark:text-slate-300 table-row-hover">
+                        <td className="py-2.5 px-4 font-semibold flex items-center gap-2.5">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-black/10 dark:border-white/10" style={{ backgroundColor: cat.color }} />
                           <span>{cat.category_name}</span>
                         </td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-900 dark:text-white">{cat.total}</td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-4 text-center font-bold text-slate-900 dark:text-white">{cat.total}</td>
+                        <td className="py-2.5 px-4 text-center">
                           <span className="inline-flex px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
                             {cat.open}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className="inline-flex px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-450 font-bold text-[10px]">
+                        <td className="py-2.5 px-4 text-center">
+                          <span className="inline-flex px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 font-bold text-[10px]">
                             {cat.in_progress}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-4 text-center">
                           <span className="inline-flex px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold text-[10px]">
                             {cat.on_hold}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 font-bold text-[10px]">
+                        <td className="py-2.5 px-4 text-center">
+                          <span className="inline-flex px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
                             {cat.closed}
                           </span>
                         </td>
@@ -519,28 +508,27 @@ export default function Dashboard() {
       )}
 
       {/* Tasks Overview Panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Panel 1: My Tasks */}
-        <div className="glass-card rounded-2xl p-6 space-y-6 relative">
+        <div className="glass-card card-accent rounded-lg p-5 space-y-5 relative">
           {tasksLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-2xl z-10">
-              <RefreshCw className="w-6 h-6 text-indigo-650 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-lg z-10">
+              <RefreshCw className="w-5 h-5 text-indigo-600 animate-spin" />
             </div>
           )}
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-655 dark:text-indigo-400">
-                <UserCheck className="w-5 h-5" />
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                <UserCheck className="w-4.5 h-4.5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-slate-900 dark:text-white">My Tasks</h3>
-                <p className="text-xs text-slate-500">Tasks assigned to you</p>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">My Tasks</h3>
+                <p className="text-[11px] text-slate-500">Tasks assigned to you</p>
               </div>
             </div>
-            
-            {/* Sub-tabs for grouping */}
-            <div className="flex flex-wrap items-center gap-1 bg-slate-100 dark:bg-slate-950/40 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800/60">
+
+            <div className="flex flex-wrap items-center gap-0.5 bg-slate-100 dark:bg-slate-900/50 p-0.5 rounded-md border border-slate-200 dark:border-slate-700/40">
               {([
                 { key: 'all', label: 'All' },
                 { key: 'Open', label: 'Open' },
@@ -551,24 +539,22 @@ export default function Dashboard() {
                 <button
                   key={tab.key}
                   onClick={() => setMyTasksActiveStatus(tab.key)}
-                  className={`px-2 py-1 text-[10px] font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                    myTasksActiveStatus === tab.key
-                      ? 'bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-sm'
+                  className={`px-2 py-1 text-[10px] font-semibold rounded transition-all cursor-pointer flex items-center gap-1 ${myTasksActiveStatus === tab.key
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
+                    }`}
                 >
                   <span>{tab.label}</span>
-                  <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
-                    myTasksActiveStatus === tab.key
+                  <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[8px] font-bold ${myTasksActiveStatus === tab.key
                       ? 'bg-indigo-500 text-white'
                       : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
+                    }`}>
                     {
                       tab.key === 'all' ? myTasks.length :
-                      tab.key === 'Open' ? myTasks.filter((t) => t.status === 'Open').length :
-                      tab.key === 'On Progress' ? myTasks.filter((t) => t.status === 'On Progress').length :
-                      tab.key === 'On Hold' ? myTasks.filter((t) => t.status === 'On Hold').length :
-                      myTasks.filter((t) => t.status === 'Closed').length
+                        tab.key === 'Open' ? myTasks.filter((t) => t.status === 'Open').length :
+                          tab.key === 'On Progress' ? myTasks.filter((t) => t.status === 'On Progress').length :
+                            tab.key === 'On Hold' ? myTasks.filter((t) => t.status === 'On Hold').length :
+                              myTasks.filter((t) => t.status === 'Closed').length
                     }
                   </span>
                 </button>
@@ -576,10 +562,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Task list container */}
-          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
             {(myTasksActiveStatus === 'all' ? myTasks : myTasks.filter((t) => t.status === myTasksActiveStatus)).length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-550">
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
                 <p className="text-sm">No tasks found in this category</p>
               </div>
             ) : (
@@ -587,14 +572,14 @@ export default function Dashboard() {
                 <a
                   key={task.uuid}
                   href={`/tasks?uuid=${task.uuid}`}
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/60 bg-slate-50/50 dark:bg-[#0d1428]/20 hover:bg-slate-100 dark:hover:bg-[#0d1428]/50 hover:border-indigo-500/30 transition-all group"
+                  className="flex items-center justify-between p-3 rounded-md border border-slate-200/80 dark:border-slate-700/40 bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100 dark:hover:bg-slate-900/40 hover:border-indigo-500/30 transition-all hover-translate-x group"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(task.phone)} flex items-center justify-center text-white font-extrabold text-xs shadow-sm flex-shrink-0`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-md bg-gradient-to-br ${getAvatarGradient(task.phone)} flex items-center justify-center text-white font-extrabold text-[10px] shadow-sm flex-shrink-0`}>
                       {task.contact_name ? task.contact_name.charAt(0).toUpperCase() : '+'}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
                           {task.contact_name || `+${task.phone.split('@')[0]}`}
                         </span>
@@ -612,25 +597,24 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3 flex-shrink-0">
+
+                  <div className="flex items-center gap-2.5 flex-shrink-0">
                     <div className="text-right">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        task.status === 'Open'
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold ${task.status === 'Open'
                           ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                           : task.status === 'On Progress'
-                          ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-455'
-                          : task.status === 'On Hold'
-                          ? 'bg-orange-500/10 text-orange-655 dark:text-orange-400'
-                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-455'
-                      }`}>
+                            ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+                            : task.status === 'On Hold'
+                              ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        }`}>
                         {task.status}
                       </span>
-                      <span className="block text-[8px] text-slate-500 dark:text-slate-550 mt-1 font-mono">
+                      <span className="block text-[8px] text-slate-500 dark:text-slate-500 mt-1 font-mono">
                         {new Date(task.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
                   </div>
                 </a>
               ))
@@ -639,33 +623,32 @@ export default function Dashboard() {
         </div>
 
         {/* Panel 2: Unassigned Open Tasks */}
-        <div className="glass-card rounded-2xl p-6 space-y-6 relative">
+        <div className="glass-card card-accent-amber rounded-lg p-5 space-y-5 relative">
           {tasksLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-2xl z-10">
-              <RefreshCw className="w-6 h-6 text-indigo-600 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-lg z-10">
+              <RefreshCw className="w-5 h-5 text-indigo-600 animate-spin" />
             </div>
           )}
 
           <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400">
-                <Inbox className="w-5 h-5" />
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-md bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400">
+                <Inbox className="w-4.5 h-4.5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Unassigned Open Tasks</h3>
-                <p className="text-xs text-slate-500">Open tasks needing PIC assignment</p>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Unassigned Open Tasks</h3>
+                <p className="text-[11px] text-slate-500">Open tasks needing PIC assignment</p>
               </div>
             </div>
-            
+
             <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/25">
               {unassignedTasks.length} Pending
             </span>
           </div>
 
-          {/* Task list container */}
-          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1">
             {unassignedTasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-550">
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400 dark:text-slate-500">
                 <p className="text-sm">All tasks have been assigned!</p>
               </div>
             ) : (
@@ -673,14 +656,14 @@ export default function Dashboard() {
                 <a
                   key={task.uuid}
                   href={`/tasks?uuid=${task.uuid}`}
-                  className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/60 bg-slate-50/50 dark:bg-[#0d1428]/20 hover:bg-slate-100 dark:hover:bg-[#0d1428]/50 hover:border-orange-500/30 transition-all group"
+                  className="flex items-center justify-between p-3 rounded-md border border-slate-200/80 dark:border-slate-700/40 bg-slate-50/50 dark:bg-slate-900/20 hover:bg-slate-100 dark:hover:bg-slate-900/40 hover:border-orange-500/30 transition-all hover-translate-x group"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(task.phone)} flex items-center justify-center text-white font-extrabold text-xs shadow-sm flex-shrink-0`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-md bg-gradient-to-br ${getAvatarGradient(task.phone)} flex items-center justify-center text-white font-extrabold text-[10px] shadow-sm flex-shrink-0`}>
                       {task.contact_name ? task.contact_name.charAt(0).toUpperCase() : '+'}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">
                           {task.contact_name || `+${task.phone.split('@')[0]}`}
                         </span>
@@ -698,17 +681,17 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3 flex-shrink-0">
+
+                  <div className="flex items-center gap-2.5 flex-shrink-0">
                     <div className="text-right">
                       <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
                         {task.status}
                       </span>
-                      <span className="block text-[8px] text-slate-500 dark:text-slate-550 mt-1 font-mono">
+                      <span className="block text-[8px] text-slate-500 dark:text-slate-500 mt-1 font-mono">
                         {new Date(task.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-orange-500 transition-colors" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-orange-500 transition-colors" />
                   </div>
                 </a>
               ))
@@ -718,24 +701,24 @@ export default function Dashboard() {
       </div>
 
       {/* User Tasks by Status Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left Column: Users List */}
-        <div className="glass-card rounded-2xl p-6 space-y-6 lg:col-span-1 flex flex-col relative">
-          <div className="flex items-center gap-3 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
-            <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-650 dark:text-indigo-400">
-              <Users className="w-5 h-5" />
+        <div className="glass-card rounded-lg p-5 space-y-5 lg:col-span-1 flex flex-col relative">
+          <div className="flex items-center gap-2.5 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
+            <div className="p-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+              <Users className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                {user?.role === 'admin' ? 'Team Members' : 'My Worker Profile'}
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                {user?.role === 'superadmin' || user?.role === 'owner_subscriber' ? 'Team Members' : 'My Worker Profile'}
               </h3>
-              <p className="text-xs text-slate-500">
-                {user?.role === 'admin' ? 'Select user to view assigned tasks' : 'Your active login profile'}
+              <p className="text-[11px] text-slate-500">
+                {user?.role === 'superadmin' || user?.role === 'owner_subscriber' ? 'Select user to view assigned tasks' : 'Your active login profile'}
               </p>
             </div>
           </div>
 
-          <div className="space-y-2.5 overflow-y-auto max-h-[400px] pr-1">
+          <div className="space-y-2 overflow-y-auto max-h-[400px] pr-1">
             {users.map((u) => {
               const isSelected = selectedUser?.id === u.id;
               const userInitials = u.nickname
@@ -745,14 +728,13 @@ export default function Dashboard() {
                 <button
                   key={u.id}
                   onClick={() => setSelectedUser(u)}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left cursor-pointer group ${
-                    isSelected
+                  className={`w-full flex items-center justify-between p-2.5 rounded-md border transition-all text-left cursor-pointer group ${isSelected
                       ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-900 dark:text-indigo-200'
-                      : 'bg-slate-50/50 dark:bg-[#0d1428]/20 border-slate-200/80 dark:border-slate-800/60 hover:bg-slate-100 dark:hover:bg-[#0d1428]/50 hover:border-slate-350 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                  }`}
+                      : 'bg-slate-50/50 dark:bg-slate-900/20 border-slate-200/80 dark:border-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(u.email || u.name)} flex items-center justify-center text-white font-extrabold text-xs shadow-sm flex-shrink-0`}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-md bg-gradient-to-br ${getAvatarGradient(u.email || u.name)} flex items-center justify-center text-white font-extrabold text-[10px] shadow-sm flex-shrink-0`}>
                       {userInitials}
                     </div>
                     <div className="min-w-0">
@@ -765,11 +747,12 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase border ${
-                    u.role === 'admin'
+                  <span className={`inline-flex px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase border ${u.role === 'superadmin'
                       ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-                      : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                  }`}>
+                      : u.role === 'owner_subscriber'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                    }`}>
                     {u.role}
                   </span>
                 </button>
@@ -779,35 +762,34 @@ export default function Dashboard() {
         </div>
 
         {/* Right Column: Tasks Grouped by Status */}
-        <div className="glass-card rounded-2xl p-6 lg:col-span-2 space-y-6 flex flex-col relative min-h-[450px]">
+        <div className="glass-card rounded-lg p-5 lg:col-span-2 space-y-5 flex flex-col relative min-h-[450px]">
           {selectedTasksLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-2xl z-10">
-              <RefreshCw className="w-6 h-6 text-indigo-650 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center bg-white/20 dark:bg-black/10 backdrop-blur-[1px] rounded-lg z-10">
+              <RefreshCw className="w-5 h-5 text-indigo-600 animate-spin" />
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-650 dark:text-indigo-400">
-                <ListTodo className="w-5 h-5" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/60 dark:border-slate-800/60 pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                <ListTodo className="w-4.5 h-4.5" />
               </div>
               <div>
-                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                   Tasks for {selectedUser?.nickname || selectedUser?.name || 'User'}
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-[11px] text-slate-500">
                   Assigned tasks categorized by current status
                 </p>
               </div>
             </div>
-            
+
             <span className="inline-flex px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-xs font-bold">
               {selectedUserTasks.length} Total Tasks
             </span>
           </div>
 
-          {/* Grid of 4 Status Columns */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 flex-grow">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 flex-grow">
             {(['Open', 'On Progress', 'On Hold', 'Closed'] as const).map((status) => {
               const tasksInStatus = selectedUserTasks.filter((t) => t.status === status);
               const statusColors = {
@@ -827,24 +809,22 @@ export default function Dashboard() {
                   taskBorder: 'hover:border-orange-500/30'
                 },
                 'Closed': {
-                  headerBg: 'bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 border-emerald-500/20',
+                  headerBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
                   badgeBg: 'bg-emerald-500 text-white',
                   taskBorder: 'hover:border-emerald-500/30'
                 }
               }[status];
 
               return (
-                <div key={status} className="flex flex-col bg-slate-50/30 dark:bg-[#090e1a]/20 border border-slate-200/50 dark:border-slate-800/40 rounded-xl p-3 space-y-3 min-h-[250px] max-h-[380px]">
-                  {/* Status Column Header */}
-                  <div className={`flex items-center justify-between p-2 rounded-lg border ${statusColors.headerBg} font-semibold text-[10px]`}>
+                <div key={status} className="flex flex-col bg-slate-50/30 dark:bg-slate-900/20 border border-slate-200/50 dark:border-slate-700/30 rounded-md p-2.5 space-y-2.5 min-h-[250px] max-h-[380px]">
+                  <div className={`flex items-center justify-between p-2 rounded-md border ${statusColors.headerBg} font-semibold text-[10px]`}>
                     <span>{status}</span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${statusColors.badgeBg}`}>
                       {tasksInStatus.length}
                     </span>
                   </div>
 
-                  {/* Tasks List */}
-                  <div className="flex-grow overflow-y-auto space-y-2 pr-0.5">
+                  <div className="flex-grow overflow-y-auto space-y-1.5 pr-0.5">
                     {tasksInStatus.length === 0 ? (
                       <div className="flex items-center justify-center h-20 text-[10px] text-slate-400 dark:text-slate-500 italic">
                         Empty
@@ -854,7 +834,7 @@ export default function Dashboard() {
                         <a
                           key={task.uuid}
                           href={`/tasks?uuid=${task.uuid}`}
-                          className={`block p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800/60 bg-white dark:bg-[#0d1428]/40 hover:bg-slate-55 dark:hover:bg-[#0d1428]/80 transition-all group ${statusColors.taskBorder}`}
+                          className={`block p-2 rounded-md border border-slate-200/80 dark:border-slate-700/40 bg-white dark:bg-slate-900/40 hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-all hover-translate-x group ${statusColors.taskBorder}`}
                         >
                           <div className="flex items-center justify-between gap-1.5 min-w-0">
                             <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 truncate">
@@ -872,7 +852,7 @@ export default function Dashboard() {
                           <p className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-1">
                             {task.trigger_msg}
                           </p>
-                          <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-850">
+                          <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800">
                             <span className="text-[7px] text-slate-400 font-mono">
                               {new Date(task.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                             </span>
@@ -892,25 +872,23 @@ export default function Dashboard() {
       </div>
 
       {/* Queue Monitor */}
-      <div className="glass-card rounded-2xl p-6 space-y-5">
-        {/* Header */}
+      {user?.role === 'superadmin' && <div className="glass-card card-accent-indigo rounded-lg p-5 space-y-5">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
-              <Layers className="w-5 h-5" />
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
+              <Layers className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Redis Queue Monitor</h3>
-              <p className="text-xs text-slate-500">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Redis Queue Monitor</h3>
+              <p className="text-[11px] text-slate-500">
                 {lastUpdated
                   ? `Last updated: ${lastUpdated.toLocaleTimeString()} · Auto-refresh every 10s`
                   : 'Loading stream statistics...'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Redis status badge */}
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${queueStats?.redis_connected
+          <div className="flex items-center gap-2.5">
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${queueStats?.redis_connected
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
               : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
               }`}>
@@ -920,7 +898,7 @@ export default function Dashboard() {
             <button
               onClick={fetchQueueStats}
               disabled={queueLoading}
-              className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800/40 border border-slate-300 dark:border-slate-700/30 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              className="p-2 rounded-md bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/30 text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-all cursor-pointer"
               title="Refresh Queue Stats"
             >
               <RefreshCw className={`w-4 h-4 ${queueLoading ? 'animate-spin' : ''}`} />
@@ -929,31 +907,28 @@ export default function Dashboard() {
         </div>
 
         {/* Stream Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {/* Total Enqueued */}
-          <div className="bg-purple-50/40 dark:bg-[#0d1428]/60 border border-purple-100 dark:border-purple-950/40 rounded-xl p-4 flex flex-col gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="bg-purple-50/40 dark:bg-slate-900/40 border border-purple-100 dark:border-purple-950/40 rounded-md p-3.5 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
               <Zap className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Total Enqueued</span>
             </div>
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-450">{queueStats?.stream_length ?? '—'}</p>
+            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{queueStats?.stream_length ?? '—'}</p>
             <p className="text-[10px] text-slate-500">Stream entries (XLEN)</p>
           </div>
 
-          {/* Pending In Queue (PEL) */}
-          <div className="bg-amber-50/40 dark:bg-[#0d1428]/60 border border-amber-100 dark:border-amber-950/40 rounded-xl p-4 flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-amber-650 dark:text-amber-400">
+          <div className="bg-amber-50/40 dark:bg-slate-900/40 border border-amber-100 dark:border-amber-950/40 rounded-md p-3.5 flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <Clock className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-wider">In-Flight</span>
             </div>
-            <p className="text-2xl font-bold text-amber-655 dark:text-amber-300">
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-300">
               {queueStats?.pending_in_queue ?? '—'}
             </p>
             <p className="text-[10px] text-slate-500">PEL (XPENDING)</p>
           </div>
 
-          {/* Active Consumers */}
-          <div className="bg-blue-50/40 dark:bg-[#0d1428]/60 border border-blue-100 dark:border-blue-950/40 rounded-xl p-4 flex flex-col gap-2">
+          <div className="bg-blue-50/40 dark:bg-slate-900/40 border border-blue-100 dark:border-blue-950/40 rounded-md p-3.5 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
               <Activity className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Consumers</span>
@@ -962,8 +937,7 @@ export default function Dashboard() {
             <p className="text-[10px] text-slate-500">Active workers</p>
           </div>
 
-          {/* DB Pending */}
-          <div className="bg-slate-50 dark:bg-[#0d1428]/60 border border-slate-200 dark:border-slate-800/60 rounded-xl p-4 flex flex-col gap-2">
+          <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/40 rounded-md p-3.5 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
               <Clock className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-wider">DB Pending</span>
@@ -972,18 +946,16 @@ export default function Dashboard() {
             <p className="text-[10px] text-slate-500">Awaiting processing</p>
           </div>
 
-          {/* DB Sent */}
-          <div className="bg-emerald-50/40 dark:bg-[#0d1428]/60 border border-emerald-100 dark:border-emerald-950/40 rounded-xl p-4 flex flex-col gap-2">
+          <div className="bg-emerald-50/40 dark:bg-slate-900/40 border border-emerald-100 dark:border-emerald-950/40 rounded-md p-3.5 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Sent</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-650 dark:text-emerald-400">{(queueStats?.db_sent ?? 0) + (queueStats?.db_delivered ?? 0)}</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{(queueStats?.db_sent ?? 0) + (queueStats?.db_delivered ?? 0)}</p>
             <p className="text-[10px] text-slate-500">Sent + Delivered</p>
           </div>
 
-          {/* DB Failed */}
-          <div className="bg-red-50/40 dark:bg-[#0d1428]/60 border border-red-100 dark:border-red-950/40 rounded-xl p-4 flex flex-col gap-2">
+          <div className="bg-red-50/40 dark:bg-slate-900/40 border border-red-100 dark:border-red-950/40 rounded-md p-3.5 flex flex-col gap-2">
             <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <XCircle className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-wider">Failed</span>
@@ -1002,8 +974,7 @@ export default function Dashboard() {
               <span>Throughput Overview</span>
               <span>{queueStats.db_total} total DB messages</span>
             </div>
-            <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-              {/* Sent + Delivered */}
+            <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
               {(queueStats.db_sent + queueStats.db_delivered) > 0 && (
                 <div
                   className="h-full bg-emerald-500 transition-all duration-700"
@@ -1011,7 +982,6 @@ export default function Dashboard() {
                   title={`Sent: ${queueStats.db_sent + queueStats.db_delivered}`}
                 />
               )}
-              {/* Pending */}
               {queueStats.db_pending > 0 && (
                 <div
                   className="h-full bg-amber-500 transition-all duration-700"
@@ -1019,7 +989,6 @@ export default function Dashboard() {
                   title={`Pending: ${queueStats.db_pending}`}
                 />
               )}
-              {/* Failed */}
               {queueStats.db_failed > 0 && (
                 <div
                   className="h-full bg-red-500 transition-all duration-700"
@@ -1035,30 +1004,30 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* System Status and Quick Guide */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {user?.role === 'superadmin' && <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Status Component */}
-        <div className="glass-card rounded-2xl p-6 lg:col-span-1 space-y-4">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Service Infrastructure</h3>
-          <p className="text-xs text-slate-600 dark:text-slate-400">Current status of backend service dependencies.</p>
+        <div className="glass-card rounded-lg p-5 lg:col-span-1 space-y-4">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">Service Infrastructure</h3>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">Current status of backend service dependencies.</p>
 
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0d1428]/40 border border-slate-200 dark:border-slate-800/60">
-              <div className="flex items-center gap-3">
-                <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <div className="space-y-2.5 pt-1">
+            <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700/40">
+              <div className="flex items-center gap-2.5">
+                <Database className="w-4.5 h-4.5 text-blue-600 dark:text-blue-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">PostgreSQL</span>
               </div>
-              <span className="text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full font-medium">Healthy</span>
+              <span className="text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full font-medium">Healthy</span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0d1428]/40 border border-slate-200 dark:border-slate-800/60">
-              <div className="flex items-center gap-3">
-                <Cpu className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700/40">
+              <div className="flex items-center gap-2.5">
+                <Cpu className="w-4.5 h-4.5 text-red-600 dark:text-red-400" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Redis Stream DB</span>
               </div>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${queueStats?.redis_connected
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${queueStats?.redis_connected
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : 'bg-red-500/10 text-red-600 dark:text-red-400'
                 }`}>
@@ -1066,12 +1035,12 @@ export default function Dashboard() {
               </span>
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0d1428]/40 border border-slate-200 dark:border-slate-800/60">
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="w-5 h-5 text-whatsapp" />
+            <div className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700/40">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-4.5 h-4.5 text-emerald-500" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Queue Worker</span>
               </div>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${(queueStats?.consumer_count ?? 0) > 0
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${(queueStats?.consumer_count ?? 0) > 0
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                 }`}>
@@ -1082,21 +1051,21 @@ export default function Dashboard() {
         </div>
 
         {/* API Info / Guide */}
-        <div className="glass-card rounded-2xl p-6 lg:col-span-2 space-y-4">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Quick Integration Guide</h3>
-          <p className="text-xs text-slate-600 dark:text-slate-400">Trigger WhatsApp notifications automatically using a simple HTTP POST request.</p>
+        <div className="glass-card rounded-lg p-5 lg:col-span-2 space-y-4">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">Quick Integration Guide</h3>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">Trigger WhatsApp notifications automatically using a simple HTTP POST request.</p>
 
-          <div className="space-y-4 pt-2">
+          <div className="space-y-3 pt-1">
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Endpoint URL</p>
-              <div className="p-3 rounded-xl bg-slate-100 dark:bg-[#0d1428] border border-slate-200 dark:border-slate-800/60 text-slate-700 dark:text-slate-300 font-mono text-sm overflow-x-auto whitespace-nowrap">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Endpoint URL</p>
+              <div className="p-2.5 rounded-md bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/40 text-slate-700 dark:text-slate-300 font-mono text-sm overflow-x-auto whitespace-nowrap">
                 POST http://localhost:8000/api/messages/send
               </div>
             </div>
 
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">JSON Request Body</p>
-              <pre className="p-4 rounded-xl bg-slate-100 dark:bg-[#0d1428] border border-slate-200 dark:border-slate-800/60 text-emerald-600 dark:text-emerald-400 font-mono text-xs overflow-x-auto leading-relaxed">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">JSON Request Body</p>
+              <pre className="p-3 rounded-md bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/40 text-emerald-600 dark:text-emerald-400 font-mono text-xs overflow-x-auto leading-relaxed">
                 {`{
   "device_id": 1,
   "phone": "628123456789",
@@ -1106,7 +1075,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

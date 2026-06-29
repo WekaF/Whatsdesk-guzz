@@ -38,7 +38,7 @@ func ListUnsavedSenders(c *fiber.Ctx) error {
 
 	// 1. Resolve active devices for this user
 	var deviceIDs []uint64
-	if role == "admin" {
+	if role == "superadmin" {
 		if err := database.DB.Model(&model.Device{}).Pluck("id", &deviceIDs).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to resolve devices",
@@ -65,7 +65,7 @@ func ListUnsavedSenders(c *fiber.Ctx) error {
 	// 2. Fetch all contacts phone numbers for this user to filter them out
 	var contactPhones []string
 	var contactErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		contactErr = database.DB.Model(&model.Contact{}).Pluck("phone", &contactPhones).Error
 	} else {
 		contactErr = database.DB.Model(&model.Contact{}).

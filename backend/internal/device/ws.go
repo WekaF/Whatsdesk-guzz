@@ -172,7 +172,7 @@ func WebSocketHandler(c *websocket.Conn) {
 	// 2. Validate device ownership
 	var device model.Device
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("uuid = ?", deviceUUID).First(&device).Error
 	} else {
 		dbErr = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").

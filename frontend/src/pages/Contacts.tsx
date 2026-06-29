@@ -22,7 +22,7 @@ interface Contact {
 export default function Contacts() {
   const { user, permissions, devices: storeDevices } = useStore();
   const connectedDevices = storeDevices.filter(d => d.status === 'CONNECTED');
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'superadmin';
   const contactsPerm = permissions?.find(p => p.key === 'contacts');
   const canCreate = isAdmin || !!contactsPerm?.can_create;
   const canUpdate = isAdmin || !!contactsPerm?.can_update;
@@ -288,14 +288,14 @@ export default function Contacts() {
           <div className="flex gap-2.5 w-full sm:w-auto">
             <button
               onClick={handleOpenImport}
-              className="w-1/2 sm:w-auto flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-350 hover:text-slate-950 dark:hover:text-white hover:border-slate-350 dark:hover:border-slate-700 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm"
+              className="w-1/2 sm:w-auto flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-350 hover:text-slate-950 dark:hover:text-white hover:border-slate-350 dark:hover:border-slate-700 px-4 py-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer shadow-sm"
             >
               <Download className="w-4 h-4" />
               <span>Import Contacts</span>
             </button>
             <button
               onClick={handleOpenAdd}
-              className="w-1/2 sm:w-auto flex items-center justify-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer glow-green shadow"
+              className="w-1/2 sm:w-auto flex items-center justify-center gap-2 bg-whatsapp hover:bg-emerald-500 text-black px-4 py-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer glow-green shadow"
             >
               <Plus className="w-4 h-4" />
               <span>Add Contact</span>
@@ -305,7 +305,7 @@ export default function Contacts() {
       </div>
 
       {error && !isAddOpen && !isEditOpen && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-sm flex items-center gap-2">
+        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-sm flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -341,7 +341,7 @@ export default function Contacts() {
       </div>
 
       {activeTab === 'directory' && (
-        <div className="glass-card rounded-2xl p-4 flex flex-col md:flex-row items-center gap-4">
+        <div className="glass-card rounded-lg p-4 flex flex-col md:flex-row items-center gap-4">
           <div className="relative flex-1 w-full">
             <Search className="absolute left-4 top-3.5 h-4.5 w-4.5 text-slate-450 dark:text-slate-550" />
             <input
@@ -349,7 +349,7 @@ export default function Contacts() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, phone or group..."
-              className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+              className="w-full pl-12 pr-4 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
             />
           </div>
 
@@ -357,7 +357,7 @@ export default function Contacts() {
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0d1428] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-whatsapp cursor-pointer text-sm"
+              className="w-full px-4 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#0d1428] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-whatsapp cursor-pointer text-sm"
             >
               <option value="" className="bg-white dark:bg-[#0d1428] text-slate-800 dark:text-white">All Groups</option>
               {groups.map((group) => (
@@ -371,7 +371,7 @@ export default function Contacts() {
       )}
 
       {/* Directory Grid */}
-      <div className="glass-card rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-850">
+      <div className="glass-card card-accent rounded-lg overflow-hidden border border-slate-200 dark:border-slate-850">
         <div className="overflow-x-auto">
           {activeTab === 'directory' ? (
             <table className="w-full border-collapse text-left">
@@ -657,7 +657,7 @@ export default function Contacts() {
       {/* Add Contact Modal */}
       {isAddOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md glass-card rounded-2xl p-6 space-y-6 animate-zoom-in">
+          <div className="w-full max-w-md glass-card rounded-lg p-6 space-y-6 animate-zoom-in">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Create New Contact</h3>
               <button
@@ -669,13 +669,13 @@ export default function Contacts() {
             </div>
 
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
+              <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
                 {error}
               </div>
             )}
 
             {success && (
-              <div className="p-4 rounded-xl bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs flex items-center gap-2 font-semibold">
+              <div className="p-4 rounded-md bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs flex items-center gap-2 font-semibold">
                 <Check className="w-4 h-4" />
                 <span>{success}</span>
               </div>
@@ -690,7 +690,7 @@ export default function Contacts() {
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. John Doe"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -702,7 +702,7 @@ export default function Contacts() {
                   onChange={(e) => setFormPhone(e.target.value)}
                   placeholder="e.g. 628123456789"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-450 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm font-mono"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-450 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm font-mono"
                 />
               </div>
 
@@ -711,7 +711,7 @@ export default function Contacts() {
                 <select
                   value={formDeviceId}
                   onChange={(e) => setFormDeviceId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
                 >
                   <option value="" className="bg-white dark:bg-[#0d1428] text-slate-800 dark:text-white">No associated device (Manual)</option>
                   {storeDevices.map((device) => (
@@ -729,7 +729,7 @@ export default function Contacts() {
                   value={formGroup}
                   onChange={(e) => setFormGroup(e.target.value)}
                   placeholder="e.g. Customers, VIP, Staff"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-405 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-405 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -737,14 +737,14 @@ export default function Contacts() {
                 <button
                   type="button"
                   onClick={() => setIsAddOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
+                  className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
                 >
                   <span>{actionLoading ? 'Saving...' : 'Add Contact'}</span>
                 </button>
@@ -757,7 +757,7 @@ export default function Contacts() {
       {/* Edit Contact Modal */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md glass-card rounded-2xl p-6 space-y-6 animate-zoom-in">
+          <div className="w-full max-w-md glass-card rounded-lg p-6 space-y-6 animate-zoom-in">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Modify Contact Details</h3>
               <button
@@ -769,13 +769,13 @@ export default function Contacts() {
             </div>
 
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
+              <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
                 {error}
               </div>
             )}
 
             {success && (
-              <div className="p-4 rounded-xl bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs flex items-center gap-2 font-semibold">
+              <div className="p-4 rounded-md bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs flex items-center gap-2 font-semibold">
                 <Check className="w-4 h-4" />
                 <span>{success}</span>
               </div>
@@ -790,7 +790,7 @@ export default function Contacts() {
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. John Doe"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -802,7 +802,7 @@ export default function Contacts() {
                   onChange={(e) => setFormPhone(e.target.value)}
                   placeholder="e.g. 628123456789"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-450 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm font-mono"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-450 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm font-mono"
                 />
               </div>
 
@@ -811,7 +811,7 @@ export default function Contacts() {
                 <select
                   value={formDeviceId}
                   onChange={(e) => setFormDeviceId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
                 >
                   <option value="" className="bg-white dark:bg-[#0d1428] text-slate-800 dark:text-white">No associated device (Manual)</option>
                   {storeDevices.map((device) => (
@@ -829,7 +829,7 @@ export default function Contacts() {
                   value={formGroup}
                   onChange={(e) => setFormGroup(e.target.value)}
                   placeholder="e.g. Customers, VIP, Staff"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                 />
               </div>
 
@@ -837,14 +837,14 @@ export default function Contacts() {
                 <button
                   type="button"
                   onClick={() => setIsEditOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
+                  className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 shadow"
                 >
                   <span>{actionLoading ? 'Updating...' : 'Save Changes'}</span>
                 </button>
@@ -857,7 +857,7 @@ export default function Contacts() {
       {/* Import Contacts Modal */}
       {isImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md glass-card rounded-2xl p-6 space-y-6 animate-zoom-in">
+          <div className="w-full max-w-md glass-card rounded-lg p-6 space-y-6 animate-zoom-in">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Import from WhatsApp</h3>
               <button
@@ -869,13 +869,13 @@ export default function Contacts() {
             </div>
 
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
+              <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-650 dark:text-red-400 text-xs font-medium">
                 {error}
               </div>
             )}
 
             {success && importResult && (
-              <div className="p-4 rounded-xl bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs space-y-2 font-medium">
+              <div className="p-4 rounded-md bg-whatsapp/15 border border-whatsapp/20 text-emerald-600 dark:text-whatsapp text-xs space-y-2 font-medium">
                 <div className="flex items-center gap-2 font-semibold">
                   <Check className="w-4 h-4" />
                   <span>{success}</span>
@@ -892,7 +892,7 @@ export default function Contacts() {
                 <div>
                   <label className="block text-slate-600 dark:text-slate-300 text-xs font-semibold uppercase tracking-wider mb-2">Select Sender Device</label>
                   {connectedDevices.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs space-y-3 font-medium">
+                    <div className="p-4 rounded-md bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs space-y-3 font-medium">
                       <p>No connected WhatsApp devices found. You need a connected device to import contacts.</p>
                       <button
                         type="button"
@@ -910,7 +910,7 @@ export default function Contacts() {
                       value={selectedImportDevice}
                       onChange={(e) => setSelectedImportDevice(e.target.value === '' ? '' : Number(e.target.value))}
                       required
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
+                      className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-800 dark:text-white focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm cursor-pointer"
                     >
                       <option value="" className="bg-white dark:bg-slate-950 text-slate-850 dark:text-white">Choose a connected device...</option>
                       {connectedDevices.map((device) => (
@@ -929,7 +929,7 @@ export default function Contacts() {
                     value={importGroup}
                     onChange={(e) => setImportGroup(e.target.value)}
                     placeholder="e.g. WhatsApp Import"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
+                    className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d1428] text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-whatsapp focus:ring-1 focus:ring-whatsapp transition-all text-sm"
                   />
                   <p className="text-slate-500 text-[10px] mt-1">This label helps you easily filter these contacts later.</p>
                 </div>
@@ -938,14 +938,14 @@ export default function Contacts() {
                   <button
                     type="button"
                     onClick={() => setIsImportOpen(false)}
-                    className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                    className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={actionLoading || !selectedImportDevice}
-                    className="w-1/2 py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed shadow"
+                    className="w-1/2 py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed shadow"
                   >
                     <span>{actionLoading ? 'Importing...' : 'Import Contacts'}</span>
                   </button>
@@ -958,7 +958,7 @@ export default function Contacts() {
                 <button
                   type="button"
                   onClick={() => setIsImportOpen(false)}
-                  className="w-full py-2.5 rounded-xl bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green shadow"
+                  className="w-full py-2.5 rounded-md bg-whatsapp hover:bg-emerald-500 text-black font-semibold text-sm transition-all cursor-pointer glow-green shadow"
                 >
                   Close
                 </button>

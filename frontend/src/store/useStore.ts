@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
 interface User {
   id: number;
   uuid: string;
@@ -8,10 +7,14 @@ interface User {
   nickname?: string;
   email: string;
   role: string;
+  parent_id?: number;
   phone_number?: string;
   is_notification_enabled?: boolean;
+  subscription_tier?: string;
+  subscription_ends_at?: string;
+  monthly_message_sent?: number;
+  message_reset_at?: string;
 }
-
 interface Device {
   id: number;
   uuid: string;
@@ -43,6 +46,7 @@ interface AppState {
   selectedDeviceId: number | null;
   permissions: UserPermission[];
   setAuth: (token: string, user: User) => void;
+  updateUser: (user: Partial<User>) => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   logout: () => void;
   setDevices: (devices: Device[]) => void;
@@ -64,6 +68,9 @@ export const useStore = create<AppState>()(
       permissions: [],
 
       setAuth: (token, user) => set({ token, user }),
+      updateUser: (userUpdates) => set((state) => ({
+        user: state.user ? { ...state.user, ...userUpdates } : null
+      })),
       setTheme: (theme) => set({ theme }),
       logout: () => set({ token: null, user: null, devices: [], selectedDeviceId: null, permissions: [] }),
       setDevices: (devices) => set({ devices }),

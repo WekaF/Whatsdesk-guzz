@@ -32,7 +32,11 @@
     --destructive-foreground: 210 40% 98%;
 
     --ring: 222.2 84% 4.9%;
-    --radius: 0.75rem;
+    --radius: 0.5rem;
+
+    /* Accent identity colors */
+    --accent-brand: 142 70% 49%;
+    --accent-brand-subtle: 142 70% 49% / 0.08;
   }
 
   .dark {
@@ -76,65 +80,123 @@
     color: hsl(var(--foreground));
     font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* JetBrains Mono for all monospace */
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace !important;
   }
 }
 
-/* Premium Scrollbar */
+/* ==============================
+   Premium Scrollbar
+   ============================== */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--border));
-  border-radius: 9999px;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground));
 }
 
-/* Glassmorphism / UI Panel Classes */
+/* ==============================
+   Glass Panels
+   ============================== */
 .glass {
   background: #ffffff;
   border: 1px solid #e2e8f0;
 }
 
 .dark .glass {
-  background: rgba(13, 20, 38, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(13, 20, 38, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ==============================
+   Glass Card — Distinctive Style
+   ============================== */
 .glass-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 .dark .glass-card {
-  background: rgba(17, 24, 48, 0.35);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.25);
 }
 
 .glass-card:hover {
   border-color: #cbd5e1;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.06);
 }
 
 .dark .glass-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
-/* WhatsApp Theme Accents */
+/* ==============================
+   Card Accent — Distinctive Top Border
+   The signature visual identity element
+   ============================== */
+.card-accent {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-accent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #25d366, #128C7E, #075E54);
+  opacity: 0.85;
+  z-index: 1;
+}
+
+.card-accent:hover::before {
+  opacity: 1;
+  height: 3px;
+}
+
+/* Variant: indigo accent */
+.card-accent-indigo::before {
+  background: linear-gradient(90deg, #6366f1, #818cf8, #a78bfa);
+}
+
+/* Variant: amber accent */
+.card-accent-amber::before {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #fcd34d);
+}
+
+/* Variant: red accent */
+.card-accent-red::before {
+  background: linear-gradient(90deg, #ef4444, #f87171, #fca5a5);
+}
+
+/* ==============================
+   WhatsApp Theme Colors
+   ============================== */
 .text-whatsapp {
   color: #25d366;
 }
@@ -145,15 +207,45 @@
   border-color: #25d366;
 }
 
-/* Custom Glow Effects */
+/* ==============================
+   Glow Effects
+   ============================== */
 .glow-green {
-  box-shadow: 0 0 20px rgba(37, 211, 102, 0.15);
+  box-shadow: 0 0 16px rgba(37, 211, 102, 0.12);
 }
 .glow-blue {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.12);
 }
 
-/* Micro-animations */
+/* ==============================
+   Sidebar Active Indicator
+   Distinctive left-border accent line
+   ============================== */
+.nav-active {
+  position: relative;
+  background: rgba(37, 211, 102, 0.08);
+  color: #25d366;
+  font-weight: 500;
+}
+
+.nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: linear-gradient(180deg, #25d366, #128C7E);
+  border-radius: 0 3px 3px 0;
+}
+
+.dark .nav-active {
+  background: rgba(37, 211, 102, 0.08);
+}
+
+/* ==============================
+   Animations
+   ============================== */
 @keyframes pulse-slow {
   0%, 100% {
     opacity: 1;
@@ -165,6 +257,140 @@
   }
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .animate-pulse-slow {
   animation: pulse-slow 3s infinite ease-in-out;
 }
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+.animate-zoom-in {
+  animation: zoom-in 0.2s ease-out forwards;
+}
+
+/* ==============================
+   Table Hover Stripe
+   ============================== */
+.table-row-hover {
+  transition: background-color 0.15s ease;
+}
+
+.table-row-hover:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.dark .table-row-hover:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* ==============================
+   Focus Ring Utility
+   ============================== */
+.focus-ring:focus-visible {
+  outline: 2px solid #25d366;
+  outline-offset: 2px;
+}
+
+/* ==============================
+   Premium Background Patterns & Visual Accents
+   ============================== */
+.bg-grid-pattern {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image: 
+    linear-gradient(to right, rgba(99, 102, 241, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.015) 1px, transparent 1px);
+}
+
+.bg-dot-pattern {
+  background-size: 20px 20px;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+}
+
+.dark .bg-dot-pattern {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Custom glowing badge styling */
+.badge-glow-green {
+  box-shadow: 0 0 10px rgba(37, 211, 102, 0.2);
+  border: 1px solid rgba(37, 211, 102, 0.3);
+}
+
+.badge-glow-indigo {
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+/* Custom title tracking */
+.title-tracking {
+  letter-spacing: -0.02em;
+}
+
+/* Micro-translate on hover */
+.hover-translate-x {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-translate-x:hover {
+  transform: translateX(3px);
+}
+
+.hover-scale-up {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-scale-up:hover {
+  transform: scale(1.02);
+}
+

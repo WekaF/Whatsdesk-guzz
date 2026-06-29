@@ -59,11 +59,16 @@ func UploadFile(c *fiber.Ctx) error {
 	}
 
 	// 6. Return resource details to the client
-	// Serving URL path points to the local static uploads server endpoint
-	fileURL := fmt.Sprintf("/uploads/%s", uniqueName)
+	// Serving URL path points to the local static uploads server endpoint, adapted with domain name if available.
+	baseURL := cfg.AppURL
+	if baseURL == "" {
+		baseURL = c.BaseURL()
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	fileURL := fmt.Sprintf("%s/uploads/%s", baseURL, uniqueName)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"url":          fileURL,
-		"file_name":     file.Filename,
+		"file_name":    file.Filename,
 		"message_type": messageType,
 	})
 }

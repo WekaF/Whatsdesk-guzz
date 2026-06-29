@@ -116,7 +116,7 @@ export default function TaskCategories() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-900/10 p-4 rounded-2xl border border-slate-200 dark:border-slate-800/40">
+      <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-900/10 p-4 rounded-lg border border-slate-200 dark:border-slate-800/40">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white flex items-center gap-2.5">
             <Tag className="w-7 h-7 text-indigo-400 drop-shadow-[0_0_8px_rgba(99,102,241,0.4)]" />
@@ -127,14 +127,14 @@ export default function TaskCategories() {
         <div className="flex items-center gap-2">
           <button
             onClick={fetchCategories}
-            className="p-2.5 rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700 transition-all cursor-pointer shadow-sm"
+            className="p-2.5 rounded-md bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700 transition-all cursor-pointer shadow-sm"
             title="Refresh"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
           </button>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-2 bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2.5 rounded-xl transition-all cursor-pointer text-sm font-semibold shadow-md shadow-indigo-900/10 dark:shadow-indigo-950/30"
+            className="flex items-center gap-2 bg-indigo-650 hover:bg-indigo-600 text-white px-4 py-2.5 rounded-md transition-all cursor-pointer text-sm font-semibold shadow-md shadow-indigo-900/10 dark:shadow-indigo-950/30"
           >
             <Plus className="w-4 h-4" />
             <span>New Category</span>
@@ -143,7 +143,7 @@ export default function TaskCategories() {
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
+        <div className="p-4 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
           <ShieldAlert className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -165,7 +165,7 @@ export default function TaskCategories() {
           </div>
           <button
             onClick={openCreateModal}
-            className="mt-2 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer shadow"
+            className="mt-2 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-md text-sm font-semibold transition-all cursor-pointer shadow"
           >
             <Plus className="w-4 h-4" />
             Create Category
@@ -176,7 +176,7 @@ export default function TaskCategories() {
           {categories.map((cat) => (
             <div
               key={cat.uuid}
-              className="glass-card rounded-2xl p-5 flex flex-col gap-3 border border-slate-200 dark:border-slate-800/80 hover:border-slate-350 dark:hover:border-slate-700/60 transition-all group relative overflow-hidden"
+              className="glass-card card-accent rounded-lg p-5 flex flex-col gap-3 border border-slate-200 dark:border-slate-800/80 hover:border-slate-350 dark:hover:border-slate-700/60 transition-all group relative overflow-hidden"
             >
               {/* Color accent bar */}
               <div
@@ -188,7 +188,7 @@ export default function TaskCategories() {
                 <div className="flex items-center gap-3">
                   {/* Color dot */}
                   <span
-                    className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center shadow-inner"
+                    className="w-9 h-9 rounded-md flex-shrink-0 flex items-center justify-center shadow-inner"
                     style={{ backgroundColor: cat.color + '22', border: `2px solid ${cat.color}55` }}
                   >
                     <Tag className="w-4 h-4" style={{ color: cat.color }} />
@@ -216,14 +216,14 @@ export default function TaskCategories() {
               <div className="flex gap-2 border-t border-slate-200 dark:border-slate-800/60 pt-3">
                 <button
                   onClick={() => openEditModal(cat)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold transition-all cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-900/60 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold transition-all cursor-pointer"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(cat)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-500/5 dark:hover:bg-red-500/15 border border-red-200 dark:border-red-500/10 hover:border-red-300 dark:hover:border-red-500/25 text-red-650 dark:text-red-400 text-xs font-semibold transition-all cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-red-50 hover:bg-red-100 dark:bg-red-500/5 dark:hover:bg-red-500/15 border border-red-200 dark:border-red-500/10 hover:border-red-300 dark:hover:border-red-500/25 text-red-650 dark:text-red-400 text-xs font-semibold transition-all cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
@@ -237,7 +237,7 @@ export default function TaskCategories() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-card w-full max-w-md rounded-2xl p-6 border border-slate-200 dark:border-slate-700/80 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="glass-card w-full max-w-md rounded-lg p-6 border border-slate-200 dark:border-slate-700/80 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Tag className="w-5 h-5 text-indigo-400" />
@@ -252,7 +252,7 @@ export default function TaskCategories() {
             </div>
  
             {error && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
                 <ShieldAlert className="w-4 h-4 flex-shrink-0" />
                 <span>{error}</span>
               </div>
@@ -270,7 +270,7 @@ export default function TaskCategories() {
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Billing, Technical, General"
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 text-sm"
                 />
               </div>
  
@@ -282,7 +282,7 @@ export default function TaskCategories() {
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="Short description (optional)"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 text-sm"
+                  className="w-full px-4 py-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 text-sm"
                 />
               </div>
  
@@ -318,7 +318,7 @@ export default function TaskCategories() {
                     value={formColor}
                     onChange={(e) => setFormColor(e.target.value)}
                     placeholder="#6366f1"
-                    className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 text-sm font-mono"
+                    className="flex-1 px-3 py-2 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-indigo-500/60 text-sm font-mono"
                   />
                   <input
                     type="color"
@@ -331,7 +331,7 @@ export default function TaskCategories() {
               </div>
  
               {/* Preview */}
-              <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800/60 rounded-xl p-3">
+              <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800/60 rounded-md p-3">
                 <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Preview:</span>
                 <span
                   className="px-3 py-1 rounded-full text-xs font-bold border"
@@ -346,14 +346,14 @@ export default function TaskCategories() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+                  className="w-1/2 py-2.5 rounded-md border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/40 text-slate-650 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-1/2 py-2.5 rounded-xl bg-indigo-650 hover:bg-indigo-600 text-white font-semibold text-sm transition-all cursor-pointer shadow-md flex items-center justify-center gap-1"
+                  className="w-1/2 py-2.5 rounded-md bg-indigo-650 hover:bg-indigo-600 text-white font-semibold text-sm transition-all cursor-pointer shadow-md flex items-center justify-center gap-1"
                 >
                   {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
                   <span>{editingCat ? 'Update' : 'Create'}</span>

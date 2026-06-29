@@ -53,7 +53,7 @@ func ListTasks(c *fiber.Ctx) error {
 
 	// 1. Resolve active devices for this user
 	var deviceIDs []uint64
-	if role == "admin" {
+	if role == "superadmin" {
 		if err := database.DB.Model(&model.Device{}).Pluck("id", &deviceIDs).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to resolve devices",
@@ -195,7 +195,7 @@ func GetTask(c *fiber.Ctx) error {
 
 	// 1. Resolve active devices for this user to verify ownership
 	var deviceIDs []uint64
-	if role == "admin" {
+	if role == "superadmin" {
 		if err := database.DB.Model(&model.Device{}).Pluck("id", &deviceIDs).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to resolve devices",
@@ -282,7 +282,7 @@ func UpdateTask(c *fiber.Ctx) error {
 
 	// 1. Resolve active devices for this user
 	var deviceIDs []uint64
-	if role == "admin" {
+	if role == "superadmin" {
 		if err := database.DB.Model(&model.Device{}).Pluck("id", &deviceIDs).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to resolve devices",
@@ -330,7 +330,7 @@ func UpdateTask(c *fiber.Ctx) error {
 	}
 
 	// Validate PIC matches authenticated user if already assigned (admins can bypass, and PIC change request bypasses)
-	if role != "admin" && req.PICUserID == nil && task.UpdatedBy != "" && task.UpdatedBy != strconv.FormatUint(userID, 10) {
+	if role != "superadmin" && req.PICUserID == nil && task.UpdatedBy != "" && task.UpdatedBy != strconv.FormatUint(userID, 10) {
 		picName := "lain"
 		if picUID, err := strconv.ParseUint(task.UpdatedBy, 10, 64); err == nil {
 			var picUser model.User
@@ -459,8 +459,31 @@ func UpdateTask(c *fiber.Ctx) error {
 				})
 			}
 		}
-		task.CategoryID = &cat.ID
-		task.UpdatedBy = strconv.FormatUint(userID, 10)
+		if task.CategoryID == nil || *task.CategoryID != cat.ID {
+			// Resolve old category name
+			var oldCatName = "None"
+			if task.CategoryID != nil {
+				var oldCat model.TaskCategory
+				if err := database.DB.First(&oldCat, *task.CategoryID).Error; err == nil {
+					oldCatName = oldCat.Name
+				}
+			}
+
+			// Create log for Category change
+			taskLog := model.TaskLog{
+				TaskID:    task.ID,
+				OldStatus: "Kategori: " + oldCatName,
+				NewStatus: "Kategori: " + cat.Name,
+				UserID:    userID,
+				CreatedAt: time.Now(),
+			}
+			if err := database.DB.Create(&taskLog).Error; err != nil {
+				log.Printf("Warning: Failed to create TaskLog for category change: %v", err)
+			}
+
+			task.CategoryID = &cat.ID
+			task.UpdatedBy = strconv.FormatUint(userID, 10)
+		}
 	}
 
 	if req.Description != nil {

@@ -2,6 +2,7 @@ package message
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -33,22 +34,65 @@ func SendMessage(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.DeviceID == 0 || req.Phone == "" || req.Message == "" {
+	if req.DeviceID == 0 || req.Phone == "" || (req.Message == "" && req.MediaURL == "") {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Device ID, phone, and message are required",
+			"error": "Device ID, phone, and message or attachment are required",
 		})
+	}
+
+	// 0. Resolve User & Check Subscription Tier Limits for non-superadmin
+	var owner model.User
+	var err error
+	if role != "superadmin" {
+		owner, err = database.GetSubscriptionOwner(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to resolve subscription owner account",
+			})
+		}
+
+		// Reload/sync owner to get latest message count
+		if err := database.DB.First(&owner, owner.ID).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to sync subscription owner account",
+			})
+		}
+
+		// Reset monthly message counter if past reset date
+		now := time.Now()
+		if !owner.MessageResetAt.IsZero() && now.After(owner.MessageResetAt) {
+			owner.MonthlyMessageSent = 0
+			owner.MessageResetAt = now.AddDate(0, 1, 0)
+			database.DB.Save(&owner)
+		}
+
+		// Check subscription active status
+		if !model.IsSubscriptionActive(&owner) {
+			return c.Status(fiber.StatusPaymentRequired).JSON(fiber.Map{
+				"error": "Masa aktif langganan Anda telah habis. Harap perbarui langganan Anda.",
+			})
+		}
+
+		// Check monthly message limit
+		config := model.GetTierConfig(owner.SubscriptionTier)
+		if owner.MonthlyMessageSent >= config.MaxMessages {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": fmt.Sprintf("Batas kuota pengiriman pesan bulanan untuk paket %s (%d pesan) telah habis. Harap tingkatkan (upgrade) paket Anda.", owner.SubscriptionTier, config.MaxMessages),
+			})
+		}
 	}
 
 	// 1. Verify device belongs to user
 	var device model.Device
 	var dbErr error
-	if role == "admin" {
+	if role == "superadmin" {
 		dbErr = database.DB.Where("id = ?", req.DeviceID).First(&device).Error
 	} else {
 		dbErr = database.DB.Joins("JOIN user_devices ON user_devices.device_id = devices.id").
-			Where("devices.id = ? AND user_devices.user_id = ?", req.DeviceID, userID).
+			Where("devices.id = ? AND user_devices.user_id = ?", req.DeviceID, owner.ID).
 			First(&device).Error
 	}
+
 	if dbErr != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "Device not found or not owned by user",
@@ -137,6 +181,11 @@ func SendMessage(c *fiber.Ctx) error {
 		})
 	}
 
+	// Increment sent counter for non-superadmin
+	if role != "superadmin" {
+		database.DB.Model(&owner).Update("monthly_message_sent", owner.MonthlyMessageSent+1)
+	}
+
 	// Log message under the active Task
 	if taskID != nil {
 		taskOutMsg := model.TaskMessage{
@@ -155,7 +204,7 @@ func SendMessage(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := rdb.EnqueueMessage(ctx, msg.ID)
+	err = rdb.EnqueueMessage(ctx, msg.ID)
 	if err != nil {
 		// Even if queue fails, we keep the DB record and could retry later.
 		// For now return an error status, but mark status as FAILED in database
@@ -178,12 +227,13 @@ func ListMessages(c *fiber.Ctx) error {
 		Select("messages.*, COALESCE(whatsmeow_lid_map.pn, messages.phone) as phone").
 		Joins("JOIN devices ON devices.id = messages.device_id").
 		Joins("LEFT JOIN whatsmeow_lid_map ON split_part(whatsmeow_lid_map.lid, '@', 1) = split_part(messages.phone, '@', 1)")
-
-	if role != "admin" {
-		dbQuery = dbQuery.Joins("JOIN user_devices ON user_devices.device_id = messages.device_id").
-			Where("user_devices.user_id = ?", userID)
+	if role != "superadmin" {
+		owner, err := database.GetSubscriptionOwner(userID)
+		if err == nil {
+			dbQuery = dbQuery.Joins("JOIN user_devices ON user_devices.device_id = messages.device_id").
+				Where("user_devices.user_id = ?", owner.ID)
+		}
 	}
-
 	if deviceIDStr != "" {
 		deviceID, err := strconv.ParseUint(deviceIDStr, 10, 64)
 		if err == nil {
