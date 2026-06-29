@@ -173,9 +173,11 @@ func GetDeviceQR(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user context"})
 	}
 	var count int64
-	database.DB.Table("user_devices").
+	if err := database.DB.Table("user_devices").
 		Where("user_id = ? AND device_id = ?", userID, device.ID).
-		Count(&count)
+		Count(&count).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to verify device ownership"})
+	}
 	if count == 0 {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "access denied"})
 	}
