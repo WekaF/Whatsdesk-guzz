@@ -52,6 +52,7 @@ func SetupRoutes(app *fiber.App) {
 	devicesGroup.Post("/", auth.PermissionMiddleware("devices:create"), device.CreateDevice)
 	devicesGroup.Get("/", auth.PermissionMiddleware("devices:read"), device.ListDevices)
 	devicesGroup.Get("/:uuid", auth.PermissionMiddleware("devices:read"), device.GetDevice)
+	devicesGroup.Get("/:uuid/qr", auth.PermissionMiddleware("devices:read"), device.GetDeviceQR)
 	// devicesGroup.Delete("/:uuid", auth.PermissionMiddleware("devices:delete"), device.DeleteDevice)
 
 	// Messages Routes
